@@ -1,0 +1,27 @@
+@'
+# env files - NEVER commit these
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.ruff_cache/
+*.egg-info/
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# Docker
+*.log
+
+# VS Code
+.vscode/settings.json
+
+# OS
+.DS_Store
+'@ | Set-Content .gitignore
