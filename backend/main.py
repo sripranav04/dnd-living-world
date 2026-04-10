@@ -8,9 +8,11 @@ load_dotenv(dotenv_path="../.env")
 
 app = FastAPI(title="D&D Living World API")
 
+cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
