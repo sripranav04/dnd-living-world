@@ -1,34 +1,246 @@
-[data-theme="dark-gothic"] {
-  --bg-primary:   #0d0d0f;
-  --bg-surface:   #1a1a1f;
-  --accent:       #8b5cf6;
-  --text-primary: #e2e0f0;
-  --text-muted:   #888690;
-  --border:       rgba(139,92,246,0.2);
-  --health-bar:   #dc2626;
+/* ============================================================
+   D&D Living World — Theme System
+   Three biomes: dark-gothic (default), bright-forest, warm-tavern
+   Agent sets data-theme on <html> via applyUIInstruction
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Pro:ital,wght@0,300;0,400;1,300;1,400&family=Share+Tech+Mono&display=swap');
+
+/* ── Base reset ─────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
-[data-theme="bright-forest"] {
-  --bg-primary:   #0a1a0a;
-  --bg-surface:   #1a2e1a;
-  --accent:       #22c55e;
-  --text-primary: #d1fae5;
-  --text-muted:   #6b9b7a;
-  --border:       rgba(34,197,94,0.2);
-  --health-bar:   #16a34a;
+
+html,
+body,
+#root {
+  height: 100%;
+  overflow: hidden;
 }
-[data-theme="warm-tavern"] {
-  --bg-primary:   #1a100a;
-  --bg-surface:   #2d1f12;
-  --accent:       #f59e0b;
-  --text-primary: #fef3c7;
-  --text-muted:   #a07850;
-  --border:       rgba(245,158,11,0.2);
-  --health-bar:   #d97706;
-}
-* { box-sizing: border-box; margin: 0; padding: 0; }
+
 body {
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  font-family: Georgia, serif;
-  transition: background 0.6s ease, color 0.4s ease;
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.6;
+  background: var(--color-bg-base);
+  color: var(--color-text-primary);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Font aliases ───────────────────────────────────────── */
+:root {
+  --font-display: 'Cinzel', 'Georgia', serif;
+  --font-body: 'Crimson Pro', 'Georgia', serif;
+  --font-mono: 'Share Tech Mono', 'Courier New', monospace;
+}
+
+/* ============================================================
+   THEME: dark-gothic  (default — dungeon, undead, shadows)
+   ============================================================ */
+:root,
+[data-theme='dark-gothic'] {
+  --color-bg-base:          #0a0806;
+  --color-bg-panel:         #111009;
+  --color-bg-panel-light:   #1a1714;
+  --color-bg-panel-mid:     #2a2420;
+  --color-bg-card:          #1c1917;
+  --color-bg-input:         rgba(255, 255, 255, 0.04);
+  --color-bg-hover:         rgba(201, 162, 39, 0.08);
+
+  --color-text-primary:     #e8dfc8;
+  --color-text-secondary:   #c9bda0;
+  --color-text-muted:       rgba(201, 189, 160, 0.45);
+  --color-text-gold:        #c9a227;
+  --color-text-gold-dim:    #8a6d15;
+  --color-text-rune:        #6eb5d4;
+  --color-text-danger:      #e07070;
+  --color-text-success:     #7fbf5e;
+
+  --color-border:           rgba(201, 162, 39, 0.18);
+  --color-border-bright:    rgba(201, 162, 39, 0.55);
+  --color-border-input:     rgba(201, 162, 39, 0.22);
+
+  --color-hp-high:          linear-gradient(90deg, #2d7a3a, #4caf6a);
+  --color-hp-mid:           linear-gradient(90deg, #7a6a1a, #c9a227);
+  --color-hp-low:           linear-gradient(90deg, #7a1a1a, #c03030);
+  --color-hp-track:         rgba(255, 255, 255, 0.06);
+
+  --color-accent-primary:   #c9a227;
+  --color-accent-rune:      #4a7fa5;
+  --color-accent-ember:     #d4521a;
+  --color-accent-blood:     #8b1a1a;
+
+  --color-token-player:     rgba(201, 162, 39, 0.85);
+  --color-token-player-border: #c9a227;
+  --color-token-player-glow: rgba(201, 162, 39, 0.6);
+  --color-token-enemy:      rgba(180, 40, 40, 0.85);
+  --color-token-enemy-border: #c03030;
+  --color-token-enemy-glow: rgba(180, 40, 40, 0.5);
+  --color-token-npc:        rgba(60, 100, 140, 0.85);
+  --color-token-npc-border: #4a7fa5;
+
+  --map-floor-color:        #111009;
+  --map-wall-color:         #0e0b07;
+  --map-grid-color:         rgba(201, 162, 39, 0.06);
+  --map-vignette:           radial-gradient(ellipse at center, transparent 25%, rgba(8, 6, 10, 0.9) 100%);
+  --map-atmosphere:         radial-gradient(ellipse 80% 60% at 30% 50%, rgba(18, 12, 6, 0) 0%, rgba(8, 6, 10, 0.85) 100%);
+
+  --torch-color:            #f5a623;
+  --torch-glow:             rgba(245, 166, 35, 0.25);
+
+  --log-attack-color:       #d4926a;
+  --log-spell-color:        #6eb5d4;
+  --log-heal-color:         #7fbf5e;
+  --log-system-color:       #c9a227;
+  --log-move-color:         rgba(201, 189, 160, 0.5);
+
+  --scrollbar-color:        #2a2420;
+}
+
+/* ============================================================
+   THEME: bright-forest  (elven glade, nature, fey)
+   ============================================================ */
+[data-theme='bright-forest'] {
+  --color-bg-base:          #08100a;
+  --color-bg-panel:         #0d1a0f;
+  --color-bg-panel-light:   #152018;
+  --color-bg-panel-mid:     #1e2e22;
+  --color-bg-card:          #111d14;
+  --color-bg-input:         rgba(255, 255, 255, 0.04);
+  --color-bg-hover:         rgba(80, 180, 100, 0.08);
+
+  --color-text-primary:     #d4edd8;
+  --color-text-secondary:   #b0ccb4;
+  --color-text-muted:       rgba(176, 204, 180, 0.45);
+  --color-text-gold:        #7fbf5e;
+  --color-text-gold-dim:    #4a8a3a;
+  --color-text-rune:        #a8d4a0;
+  --color-text-danger:      #e07070;
+  --color-text-success:     #90e060;
+
+  --color-border:           rgba(80, 180, 100, 0.18);
+  --color-border-bright:    rgba(80, 180, 100, 0.55);
+  --color-border-input:     rgba(80, 180, 100, 0.22);
+
+  --color-hp-high:          linear-gradient(90deg, #2d7a3a, #5cd46a);
+  --color-hp-mid:           linear-gradient(90deg, #5a7a1a, #90c030);
+  --color-hp-low:           linear-gradient(90deg, #7a1a1a, #c03030);
+  --color-hp-track:         rgba(255, 255, 255, 0.06);
+
+  --color-accent-primary:   #7fbf5e;
+  --color-accent-rune:      #50b464;
+  --color-accent-ember:     #60d480;
+  --color-accent-blood:     #8b1a1a;
+
+  --color-token-player:     rgba(80, 180, 100, 0.85);
+  --color-token-player-border: #50b464;
+  --color-token-player-glow: rgba(80, 180, 100, 0.6);
+  --color-token-enemy:      rgba(180, 40, 40, 0.85);
+  --color-token-enemy-border: #c03030;
+  --color-token-enemy-glow: rgba(180, 40, 40, 0.5);
+  --color-token-npc:        rgba(80, 140, 60, 0.85);
+  --color-token-npc-border: #4a8a3a;
+
+  --map-floor-color:        #0a1a0c;
+  --map-wall-color:         #061008;
+  --map-grid-color:         rgba(80, 180, 100, 0.07);
+  --map-vignette:           radial-gradient(ellipse at center, transparent 25%, rgba(6, 14, 8, 0.9) 100%);
+  --map-atmosphere:         radial-gradient(ellipse 80% 60% at 30% 50%, rgba(10, 30, 12, 0) 0%, rgba(6, 14, 8, 0.85) 100%);
+
+  --torch-color:            #80e860;
+  --torch-glow:             rgba(128, 232, 96, 0.2);
+
+  --log-attack-color:       #d4926a;
+  --log-spell-color:        #a8d4a0;
+  --log-heal-color:         #90e060;
+  --log-system-color:       #7fbf5e;
+  --log-move-color:         rgba(176, 204, 180, 0.5);
+
+  --scrollbar-color:        #1e2e22;
+}
+
+/* ============================================================
+   THEME: warm-tavern  (firelight, inn, civilization)
+   ============================================================ */
+[data-theme='warm-tavern'] {
+  --color-bg-base:          #100a04;
+  --color-bg-panel:         #1a1008;
+  --color-bg-panel-light:   #241808;
+  --color-bg-panel-mid:     #302010;
+  --color-bg-card:          #1e1408;
+  --color-bg-input:         rgba(255, 255, 255, 0.04);
+  --color-bg-hover:         rgba(212, 140, 40, 0.08);
+
+  --color-text-primary:     #f0e0c0;
+  --color-text-secondary:   #d4b880;
+  --color-text-muted:       rgba(212, 184, 128, 0.45);
+  --color-text-gold:        #e8a020;
+  --color-text-gold-dim:    #a06010;
+  --color-text-rune:        #d4926a;
+  --color-text-danger:      #e05050;
+  --color-text-success:     #80c860;
+
+  --color-border:           rgba(212, 140, 40, 0.18);
+  --color-border-bright:    rgba(212, 140, 40, 0.55);
+  --color-border-input:     rgba(212, 140, 40, 0.22);
+
+  --color-hp-high:          linear-gradient(90deg, #2d7a3a, #4caf6a);
+  --color-hp-mid:           linear-gradient(90deg, #8a6010, #e0a020);
+  --color-hp-low:           linear-gradient(90deg, #7a1a1a, #c03030);
+  --color-hp-track:         rgba(255, 255, 255, 0.06);
+
+  --color-accent-primary:   #e8a020;
+  --color-accent-rune:      #d4521a;
+  --color-accent-ember:     #f04010;
+  --color-accent-blood:     #8b1a1a;
+
+  --color-token-player:     rgba(212, 140, 40, 0.85);
+  --color-token-player-border: #e8a020;
+  --color-token-player-glow: rgba(212, 140, 40, 0.6);
+  --color-token-enemy:      rgba(180, 40, 40, 0.85);
+  --color-token-enemy-border: #c03030;
+  --color-token-enemy-glow: rgba(180, 40, 40, 0.5);
+  --color-token-npc:        rgba(140, 80, 20, 0.85);
+  --color-token-npc-border: #a06010;
+
+  --map-floor-color:        #120c04;
+  --map-wall-color:         #0c0802;
+  --map-grid-color:         rgba(212, 140, 40, 0.07);
+  --map-vignette:           radial-gradient(ellipse at center, transparent 25%, rgba(10, 6, 2, 0.9) 100%);
+  --map-atmosphere:         radial-gradient(ellipse 80% 60% at 30% 50%, rgba(20, 12, 4, 0) 0%, rgba(10, 6, 2, 0.85) 100%);
+
+  --torch-color:            #ff8820;
+  --torch-glow:             rgba(255, 136, 32, 0.3);
+
+  --log-attack-color:       #e8a060;
+  --log-spell-color:        #d4926a;
+  --log-heal-color:         #80c860;
+  --log-system-color:       #e8a020;
+  --log-move-color:         rgba(212, 184, 128, 0.5);
+
+  --scrollbar-color:        #302010;
+}
+
+/* ── Scrollbar ───────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-color);
+  border-radius: 2px;
+}
+
+/* ── Transitions on theme switch ────────────────────────── */
+[data-theme] * {
+  transition:
+    background-color 0.5s ease,
+    border-color 0.5s ease,
+    color 0.5s ease;
 }

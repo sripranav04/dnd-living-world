@@ -1,0 +1,18 @@
+fastapi==0.135.3
+uvicorn[standard]==0.34.3
+python-dotenv==1.1.0
+pydantic==2.11.7
+
+# LangGraph + LangChain
+langgraph>=0.5.3
+langchain-core>=0.3.66
+langchain-aws>=0.2.27
+langchain-azure-ai
+
+# Postgres checkpointer
+langgraph-checkpoint-postgres
+asyncpg 
+psycopg2-binary 
+
+# HTTP client (for A2A calls in Phase 5)
+httpx==0.28.1

@@ -1,0 +1,257 @@
+.root {
+  background: var(--color-bg-panel);
+  border-left: 0.5px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── Shared ───────────────────────────────────── */
+.panelHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px 10px;
+  border-bottom: 0.5px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.panelTitle {
+  font-family: var(--font-display);
+  font-size: 10px;
+  letter-spacing: 0.28em;
+  color: var(--color-accent-primary);
+  text-transform: uppercase;
+  opacity: 0.7;
+  white-space: nowrap;
+}
+
+.ornament {
+  flex: 1;
+  height: 0.5px;
+  background: linear-gradient(90deg, var(--color-accent-primary) 0%, transparent 100%);
+  opacity: 0.3;
+}
+
+.section {
+  border-bottom: 0.5px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+/* ── Environment ──────────────────────────────── */
+.envBanner {
+  padding: 14px 16px 12px;
+  border-bottom: 0.5px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.envBiome {
+  font-family: var(--font-display);
+  font-size: 9px;
+  letter-spacing: 0.28em;
+  color: var(--color-accent-primary);
+  opacity: 0.6;
+  text-transform: uppercase;
+  margin-bottom: 5px;
+}
+
+.envName {
+  font-family: var(--font-display);
+  font-size: 14px;
+  color: var(--color-text-primary);
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
+.envDesc {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+  opacity: 0.55;
+  font-style: italic;
+}
+
+.envConditions {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  margin-top: 9px;
+}
+
+.envCond {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  padding: 2px 7px;
+  border-radius: 2px;
+  letter-spacing: 0.1em;
+  background: rgba(74, 127, 165, 0.1);
+  border: 0.5px solid rgba(74, 127, 165, 0.24);
+  color: var(--color-text-rune);
+  opacity: 0.85;
+}
+
+/* ── Dice ─────────────────────────────────────── */
+.diceGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 5px;
+  padding: 10px 14px;
+}
+
+.dieBtn {
+  background: var(--color-bg-panel-light);
+  border: 0.5px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 7px 4px;
+  border-radius: 3px;
+  cursor: pointer;
+  text-align: center;
+  letter-spacing: 0.05em;
+  transition: background 0.14s, border-color 0.14s, color 0.14s;
+}
+
+.dieBtn:hover {
+  background: rgba(201, 162, 39, 0.1);
+  border-color: var(--color-text-gold-dim);
+  color: var(--color-text-gold);
+}
+
+.dieBtn:active {
+  transform: scale(0.93);
+}
+
+.diceResult {
+  margin: 0 14px 12px;
+  background: var(--color-bg-panel-light);
+  border: 0.5px solid var(--color-border);
+  border-radius: 3px;
+  padding: 8px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 38px;
+}
+
+.diceExpr {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-text-secondary);
+  opacity: 0.5;
+}
+
+.diceVal {
+  font-family: var(--font-display);
+  font-size: 22px;
+  color: var(--color-text-gold);
+  letter-spacing: 0.04em;
+  transition: color 0.2s;
+}
+
+.diceCrit {
+  color: #f5c842;
+  text-shadow: 0 0 14px rgba(245, 200, 66, 0.55);
+  animation: critFlash 0.4s ease;
+}
+
+.diceFumble {
+  color: var(--color-text-danger);
+}
+
+@keyframes critFlash {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+
+/* ── Combat log ───────────────────────────────── */
+.combatLogSection {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.logEntries {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-color) transparent;
+}
+
+.logEntry {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.6;
+  letter-spacing: 0.03em;
+  padding: 3px 7px;
+  border-radius: 2px;
+  border-left: 2px solid transparent;
+}
+
+.logAttack {
+  color: var(--log-attack-color, #d4926a);
+  border-color: rgba(212, 82, 26, 0.38);
+  background: rgba(212, 82, 26, 0.04);
+}
+
+.logSpell {
+  color: var(--log-spell-color, #6eb5d4);
+  border-color: rgba(74, 127, 165, 0.38);
+  background: rgba(74, 127, 165, 0.04);
+}
+
+.logHeal {
+  color: var(--log-heal-color, #7fbf5e);
+  border-color: rgba(45, 122, 58, 0.38);
+  background: rgba(45, 122, 58, 0.04);
+}
+
+.logMove {
+  color: var(--log-move-color, rgba(201, 189, 160, 0.5));
+}
+
+.logSystem {
+  color: var(--log-system-color, #c9a227);
+  opacity: 0.55;
+  border-color: rgba(201, 162, 39, 0.3);
+  background: rgba(201, 162, 39, 0.03);
+}
+
+/* ── Session footer ───────────────────────────── */
+.sessionFooter {
+  border-top: 0.5px solid var(--color-border);
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.sessStat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.sessVal {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  color: var(--color-text-primary);
+  letter-spacing: 0.04em;
+}
+
+.sessLabel {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--color-text-muted);
+  letter-spacing: 0.12em;
+  text-align: center;
+}
