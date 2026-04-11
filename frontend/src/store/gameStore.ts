@@ -256,15 +256,7 @@ const uid = () => `${Date.now()}-${_idCounter++}`;
 export const useGameStore = create<GameStore>((set, get) => ({
 
   // ── Narrative ───────────────────────────────────────────
-  narrativeHistory: [
-    {
-      id: uid(),
-      speaker: 'dm',
-      speakerLabel: 'Dungeon Master',
-      text: "The torchlight gutters and nearly dies as a shadow coils across the vault ceiling. The wraith descends — a shrieking column of darkness and cold — its hollow eyes finding Aldric first. You hear the distant scream of someone it once was.",
-      timestamp: Date.now(),
-    },
-  ],
+  narrativeHistory: [],
 
   appendNarrative: (entry) =>
     set((s) => ({
@@ -277,14 +269,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   clearNarrative: () => set({ narrativeHistory: [] }),
 
   // ── Combat log ─────────────────────────────────────────
-  combatLog: [
-    { id: uid(), text: '— encounter begins: round 1 —', type: 'system', timestamp: Date.now() },
-    { id: uid(), text: 'Aldric moves to E4', type: 'move', timestamp: Date.now() },
-    { id: uid(), text: 'Aldric → Wraith · longsword · roll 18 · hit · 12 dmg', type: 'attack', timestamp: Date.now() },
-    { id: uid(), text: 'Lyra casts Ray of Enfeeblement → Wraith · CON save 12 · fail', type: 'spell', timestamp: Date.now() },
-    { id: uid(), text: 'Vex: sneak attack → Skeleton · 3d6+4 = 16 dmg · crit!', type: 'attack', timestamp: Date.now() },
-    { id: uid(), text: '— round 3 begins — Aldric\'s turn —', type: 'system', timestamp: Date.now() },
-  ],
+  combatLog: [],
 
   appendLog: (text, type) =>
     set((s) => ({
@@ -333,12 +318,20 @@ export const useGameStore = create<GameStore>((set, get) => ({
   // ── Theme ───────────────────────────────────────────────
   theme: 'dark-gothic',
   setTheme: (theme) => {
-    document.documentElement.setAttribute('data-theme', theme);
-    set({ theme });
+    const valid: Theme[] = ['dark-gothic', 'bright-forest', 'warm-tavern'];
+    // Map common Haiku mistakes to correct values
+    const map: Record<string, Theme> = {
+      'forest': 'bright-forest', 'nature': 'bright-forest', 'outdoor': 'bright-forest',
+      'tavern': 'warm-tavern', 'town': 'warm-tavern', 'city': 'warm-tavern', 'inn': 'warm-tavern',
+      'dungeon': 'dark-gothic', 'horror': 'dark-gothic', 'dark': 'dark-gothic', 'gothic': 'dark-gothic',
+    };
+    const resolved = valid.includes(theme) ? theme : (map[theme] ?? 'dark-gothic');
+    document.documentElement.setAttribute('data-theme', resolved);
+    set({ theme: resolved });
   },
 
   // ── Session stats ───────────────────────────────────────
-  sessionStats: { kills: 3, gold: 247, xp: 1200 },
+  sessionStats: { kills: 0, gold: 0, xp: 0 },
   updateSessionStats: (updates) =>
     set((s) => ({ sessionStats: { ...s.sessionStats, ...updates } })),
 
@@ -360,8 +353,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
   // ── Screen shake ─────────────────────────────────────────
   isShaking: false,
   triggerShake: () => {
-    set({ isShaking: true });
-    setTimeout(() => set({ isShaking: false }), 600);
+    set({ isShaking: false });
+    requestAnimationFrame(() => {
+      set({ isShaking: true });
+      setTimeout(() => set({ isShaking: false }), 700);
+    });
   },
 
   // ── Master UI instruction dispatcher ────────────────────

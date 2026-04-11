@@ -193,16 +193,22 @@
 
 /* ── HP bar ───────────────────────────────────── */
 .hpTrack {
-  height: 4px;
-  background: var(--color-hp-track);
+  height: 5px;
+  min-height: 5px;
+  background: rgba(255,255,255,0.08);
   border-radius: 2px;
   overflow: hidden;
+  margin: 4px 0 2px;
+  display: block;
+  width: 100%;
 }
 
 .hpFill {
   height: 100%;
+  min-height: 5px;
   border-radius: 2px;
-  transition: width 0.6s ease, background 0.4s ease;
+  transition: width 0.6s ease;
+  display: block;
 }
 
 .hpText {

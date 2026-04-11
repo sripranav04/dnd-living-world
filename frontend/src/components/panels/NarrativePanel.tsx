@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, KeyboardEvent } from 'react';
 import { useGameStore } from '../../store/gameStore';
-import { useGameStream } from '../../hooks/useGameStream';
+
 import styles from './NarrativePanel.module.css';
 
 // ── Typing indicator ──────────────────────────────────────
@@ -64,10 +64,9 @@ const QUICK_ACTIONS = [
 
 // ── NarrativePanel ────────────────────────────────────────
 
-export function NarrativePanel() {
+export function NarrativePanel({ sendAction }: { sendAction: (action: string) => void }) {
   const narrativeHistory = useGameStore((s) => s.narrativeHistory);
   const isDmTyping = useGameStore((s) => s.isDmTyping);
-  const { sendAction } = useGameStream();
 
   const [inputValue, setInputValue] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);

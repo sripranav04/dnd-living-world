@@ -13,6 +13,7 @@ langchain-azure-ai
 langgraph-checkpoint-postgres
 asyncpg 
 psycopg2-binary 
+psycopg-pool
 
 # HTTP client (for A2A calls in Phase 5)
 httpx==0.28.1

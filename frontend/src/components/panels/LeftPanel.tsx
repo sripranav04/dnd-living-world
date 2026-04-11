@@ -7,49 +7,66 @@ import styles from './LeftPanel.module.css';
 
 function HpBar({ hp, maxHp }: { hp: number; maxHp: number }) {
   const pct = Math.max(0, Math.min(100, (hp / maxHp) * 100));
-  const gradient =
-    pct > 50
-      ? 'var(--color-hp-high)'
-      : pct > 25
-      ? 'var(--color-hp-mid)'
-      : 'var(--color-hp-low)';
-
+  const barColor = pct > 50 ? '#4caf6a' : pct > 25 ? '#c9a227' : '#c03030';
   return (
-    <>
-      <div className={styles.hpTrack}>
-        <div
-          className={styles.hpFill}
-          style={{ width: `${pct}%`, background: gradient }}
-        />
+    <div style={{ marginTop: 8 }}>
+      <div style={{
+        height: 5, background: 'rgba(255,255,255,0.1)', borderRadius: 3,
+        overflow: 'hidden', width: '100%',
+      }}>
+        <div style={{
+          height: '100%', width: `${pct}%`,
+          background: barColor, borderRadius: 3,
+          transition: 'width 0.6s ease, background 0.4s ease',
+        }} />
       </div>
-      <div className={styles.hpText}>
+      <div style={{
+        display: 'flex', justifyContent: 'space-between',
+        fontFamily: 'var(--font-mono)', fontSize: 10,
+        color: pct <= 25 ? '#e07070' : 'rgba(201,189,160,0.6)',
+        marginTop: 3,
+      }}>
         <span>HP</span>
-        <span style={pct <= 25 ? { color: 'var(--color-text-danger)' } : undefined}>
-          {hp} / {maxHp}
-        </span>
+        <span>{hp} / {maxHp}</span>
       </div>
-    </>
+    </div>
   );
 }
 
 // ── Status chip ──────────────────────────────────────────
 
 const STATUS_COLORS: Record<string, string> = {
-  'poisoned':      'chip-poison',
-  'burning':       'chip-burning',
-  'shield':        'chip-shield',
-  'frightened':    'chip-danger',
-  'stunned':       'chip-danger',
-  'paralyzed':     'chip-danger',
-  'concentration': 'chip-conc',
+  'poisoned':      'chipPoison',
+  'burning':       'chipBurning',
+  'shield':        'chipShield',
+  'frightened':    'chipDanger',
+  'stunned':       'chipDanger',
+  'paralyzed':     'chipDanger',
+  'concentration': 'chipConc',
+};
+
+const CHIP_STYLES: Record<string, React.CSSProperties> = {
+  chipPoison:  { background: 'rgba(45,100,30,0.25)', color: '#7fbf5e', border: '0.5px solid rgba(127,191,94,0.3)' },
+  chipBurning: { background: 'rgba(212,82,26,0.2)',  color: '#f0874a', border: '0.5px solid rgba(212,82,26,0.35)' },
+  chipShield:  { background: 'rgba(74,127,165,0.18)', color: '#6eb5d4', border: '0.5px solid rgba(110,181,212,0.3)' },
+  chipDanger:  { background: 'rgba(180,40,40,0.2)',  color: '#e07070', border: '0.5px solid rgba(180,40,40,0.35)' },
+  chipConc:    { background: 'rgba(201,162,39,0.12)', color: '#c9a227', border: '0.5px solid rgba(201,162,39,0.3)' },
+  chipDefault: { background: 'rgba(255,255,255,0.06)', color: 'rgba(201,189,160,0.6)', border: '0.5px solid rgba(201,162,39,0.15)' },
 };
 
 function StatusChip({ label }: { label: string }) {
-  const key = Object.keys(STATUS_COLORS).find((k) =>
-    label.toLowerCase().includes(k),
+  const key = Object.keys(STATUS_COLORS).find((k) => label.toLowerCase().includes(k));
+  const styleKey = key ? STATUS_COLORS[key] : 'chipDefault';
+  const chipStyle = CHIP_STYLES[styleKey] ?? CHIP_STYLES.chipDefault;
+  return (
+    <span style={{
+      fontFamily: 'var(--font-mono)', fontSize: 9, padding: '2px 6px',
+      borderRadius: 2, letterSpacing: '0.08em', textTransform: 'uppercase' as const,
+      display: 'inline-block', ...chipStyle,
+    }}>
+      {label}
+    </span>
   );
-  const cls = key ? STATUS_COLORS[key] : 'chip-default';
-  return <span className={`${styles.chip} ${styles[cls] ?? styles.chipDefault}`}>{label}</span>;
 }
 
 // ── Character card ───────────────────────────────────────
