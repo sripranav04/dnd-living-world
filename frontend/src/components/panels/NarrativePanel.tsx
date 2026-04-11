@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState, KeyboardEvent } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import type { KeyboardEvent } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { useDiceStore } from '../../store/diceStore';
 import styles from './NarrativePanel.module.css';
@@ -68,7 +69,6 @@ export function NarrativePanel({ sendAction }: { sendAction: (action: string) =>
     const trimmed = inputValue.trim();
     if (!trimmed || isDmTyping) return;
 
-    // If there's a pending dice roll, append it to the action
     let actionText = trimmed;
     if (pendingRoll && !pendingRoll.usedInAction) {
       const rollCtx = pendingRoll.isCrit
@@ -110,44 +110,27 @@ export function NarrativePanel({ sendAction }: { sendAction: (action: string) =>
         <TypingIndicator />
       </div>
 
-      {/* Pending roll banner */}
       {isPending && (
         <div style={{
           padding: '6px 16px',
-          background: pendingRoll!.isCrit
-            ? 'rgba(245,200,66,0.12)'
-            : pendingRoll!.isFumble
-            ? 'rgba(180,40,40,0.12)'
+          background: pendingRoll!.isCrit ? 'rgba(245,200,66,0.12)'
+            : pendingRoll!.isFumble ? 'rgba(180,40,40,0.12)'
             : 'rgba(201,162,39,0.08)',
           borderTop: '0.5px solid var(--color-border)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-          flexShrink: 0,
+          display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0,
         }}>
           <span style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: 11,
+            fontFamily: 'var(--font-display)', fontSize: 11, letterSpacing: '0.2em',
             color: pendingRoll!.isCrit ? '#f5c842'
               : pendingRoll!.isFumble ? 'var(--color-text-danger)'
               : 'var(--color-text-gold)',
-            letterSpacing: '0.2em',
           }}>
             {pendingRoll!.isCrit ? '⚡ CRITICAL' : pendingRoll!.isFumble ? '💀 FUMBLE' : '🎲 ROLLED'}
           </span>
-          <span style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 18,
-            color: 'var(--color-text-primary)',
-            fontWeight: 500,
-          }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 18, color: 'var(--color-text-primary)', fontWeight: 500 }}>
             {pendingRoll!.total}
           </span>
-          <span style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 10,
-            color: 'var(--color-text-muted)',
-          }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--color-text-muted)' }}>
             {pendingRoll!.expr} · will be included in your next action
           </span>
         </div>

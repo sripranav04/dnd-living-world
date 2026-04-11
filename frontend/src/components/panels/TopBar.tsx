@@ -25,7 +25,7 @@ export function TopBar() {
       <div className={styles.center}>
         <span className={styles.liveTag}>
           <span className={styles.liveDot} />
-          DM ONLINE · BEDROCK
+          THE MASTER OF THE DUNGEONS IS HERE 
         </span>
         {world.inCombat && (
           <span className={styles.combatTag}>COMBAT ACTIVE</span>

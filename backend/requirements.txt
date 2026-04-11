@@ -1,19 +1,33 @@
+# ── Web framework ─────────────────────────────────────────
 fastapi==0.135.3
 uvicorn[standard]==0.34.3
 python-dotenv==1.1.0
 pydantic==2.11.7
 
-# LangGraph + LangChain
+# ── LangChain core ────────────────────────────────────────
 langgraph>=0.5.3
 langchain-core>=0.3.66
+
+# ── LLM providers — both included, active one set via LLM_PROVIDER env var ──
+# AWS Bedrock (LLM_PROVIDER=aws, default)
 langchain-aws>=0.2.27
-langchain-azure-ai
 
-# Postgres checkpointer
+# Azure OpenAI (LLM_PROVIDER=azure)
+langchain-openai>=0.2.0
+openai>=1.40.0
+
+# ── Postgres checkpointer ─────────────────────────────────
 langgraph-checkpoint-postgres
-asyncpg 
-psycopg2-binary 
-psycopg-pool
+asyncpg==0.30.0
+psycopg[binary]>=3.2.0
+psycopg-pool>=3.2.0
 
-# HTTP client (for A2A calls in Phase 5)
+# ── MongoDB lore memory (Phase 4) ─────────────────────────
+motor>=3.3.0
+pymongo>=4.6.0
+
+# ── HTTP client ───────────────────────────────────────────
 httpx==0.28.1
+
+# ── AWS SDK (required for Bedrock) ────────────────────────
+boto3>=1.42.0

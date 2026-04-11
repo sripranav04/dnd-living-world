@@ -1,7 +1,7 @@
-import os
 import json
 import re
-from langchain_aws import ChatBedrockConverse
+
+from llm_provider import get_llm
 from langchain_core.messages import SystemMessage, HumanMessage
 
 OPENING_PROMPT = """You are a Dungeon Master opening a D&D 5e session.
@@ -35,12 +35,7 @@ Tone: gothic horror, tense, cinematic. The party is in danger. Make them feel it
 
 
 def generate_opening() -> dict:
-    llm = ChatBedrockConverse(
-        model=os.environ["LLM_MODEL_ID"],
-        region_name=os.environ["AWS_REGION"],
-        temperature=0.9,
-        max_tokens=800,
-    )
+    llm = get_llm()
 
     response = llm.invoke([
         SystemMessage(content=OPENING_PROMPT),
@@ -49,15 +44,18 @@ def generate_opening() -> dict:
 
     raw = response.content.strip()
     raw = re.sub(r"^```json\s*", "", raw)
-    raw = re.sub(r"^```\s*", "", raw)
-    raw = re.sub(r"```\s*$", "", raw)
+    raw = re.sub(r"^```\s*",     "", raw)
+    raw = re.sub(r"```\s*$",     "", raw)
 
     try:
         return json.loads(raw)
     except json.JSONDecodeError:
         match = re.search(r"\{.*\}", raw, re.DOTALL)
         if match:
-            return json.loads(match.group())
+            try:
+                return json.loads(match.group())
+            except json.JSONDecodeError:
+                pass
         return {
             "narrative": "The vault is silent save for the distant drip of water. Something moves in the darkness ahead.",
             "ui_instructions": [],

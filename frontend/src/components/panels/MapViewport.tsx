@@ -1,16 +1,6 @@
 import React, { useEffect, useRef } from 'react';
-import { DynamicSlot } from '../DynamicSlot';
 import { useGameStore } from '../../store/gameStore';
 import styles from './MapViewport.module.css';
-
-function Torch({ style }: { style: React.CSSProperties }) {
-  return (
-    <div className={styles.torch} style={style}>
-      <div className={styles.torchGlow} />
-      <div className={styles.torchFlame} />
-    </div>
-  );
-}
 
 function MapToken({ avatar, x, y, type, isActive, name }: {
   avatar: string; x: number; y: number;
@@ -42,7 +32,6 @@ function SpellRing({ id, x, y, color }: { id: string; x: number; y: number; colo
   );
 }
 
-// Corner ornament — fully inline so sizing is explicit
 function CornerOrnament({ pos }: { pos: 'tl' | 'tr' | 'bl' | 'br' }) {
   const transforms: Record<string, string> = {
     tl: 'none', tr: 'scaleX(-1)', bl: 'scaleY(-1)', br: 'scale(-1,-1)',
@@ -73,7 +62,6 @@ export function MapViewport() {
   const isShaking = useGameStore((s) => s.isShaking);
   const shakeRef = useRef<HTMLDivElement>(null);
 
-  // Screen shake — add/remove class on the DOM element directly
   useEffect(() => {
     const el = shakeRef.current;
     if (!el || !isShaking) return;
