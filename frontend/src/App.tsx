@@ -12,7 +12,13 @@ import './styles/themes.css';
 // Inner component so useGameStream can share context with NarrativePanel
 function GameShell() {
   const theme = useGameStore((s) => s.theme);
+  const mountComponent = useGameStore((s) => s.mountComponent);
   const { sendAction } = useGameStream(); // mounts → triggers session/start
+
+  // Mount the procedural scene immediately on load
+  React.useEffect(() => {
+    mountComponent('map-scene', 'DungeonScene');
+  }, [mountComponent]);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -25,6 +31,11 @@ function GameShell() {
         <LeftPanel />
         <div style={CENTER_STYLE}>
           <div style={MAP_AREA_STYLE}>
+            {/* Scene fills entire map area — sits behind MapViewport overlay elements */}
+            <DynamicSlot slot="map-scene" style={{
+              position: 'absolute', inset: 0, zIndex: 0,
+              width: '100%', height: '100%',
+            }} />
             <MapViewport />
             <DynamicSlot slot="map-overlay" style={{
               position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 20,

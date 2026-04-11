@@ -1,8 +1,9 @@
 .root {
   position: relative;
   overflow: hidden;
-  background: #080610;
+  background: transparent;
   flex: 1;
+  z-index: 1;
 }
 
 /* ── Shake animation ──────────────────────────── */

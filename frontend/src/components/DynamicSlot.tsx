@@ -6,6 +6,7 @@ import { useGameStore } from '../store/gameStore';
 // The agent references these by string name in mount_component instructions.
 
 const COMPONENT_MAP: Record<string, React.LazyExoticComponent<React.ComponentType>> = {
+  DungeonScene:      lazy(() => import('./dynamic/DungeonScene')),
   NarrativeCard:     lazy(() => import('./dynamic/NarrativeCard')),
   EnvironmentBanner: lazy(() => import('./dynamic/EnvironmentBanner')),
   CombatHUD:         lazy(() => import('./dynamic/CombatHUD')),

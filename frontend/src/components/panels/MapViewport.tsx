@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { DynamicSlot } from '../DynamicSlot';
 import { useGameStore } from '../../store/gameStore';
 import styles from './MapViewport.module.css';
 
@@ -89,20 +90,6 @@ export function MapViewport() {
       <CornerOrnament pos="br" />
 
       <div className={styles.locationLabel}>{world.locationName}</div>
-
-      <div className={styles.scene}>
-        <div className={styles.wallTop} />
-        <div className={styles.wallBottom} />
-        <div className={styles.wallLeft} />
-        <div className={styles.wallRight} />
-        <div className={styles.floor} />
-        <Torch style={{ top: '22%', left: '16%' }} />
-        <Torch style={{ top: '22%', right: '16%' }} />
-        <Torch style={{ bottom: '22%', left: '16%' }} />
-        <Torch style={{ bottom: '22%', right: '16%' }} />
-        <div className={styles.grid} />
-        <div className={styles.mist} />
-      </div>
 
       {tokens.map((token) => (
         <MapToken key={token.id} {...token} />

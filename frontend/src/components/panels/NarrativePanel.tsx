@@ -1,9 +1,7 @@
 import React, { useEffect, useRef, useState, KeyboardEvent } from 'react';
 import { useGameStore } from '../../store/gameStore';
-
+import { useDiceStore } from '../../store/diceStore';
 import styles from './NarrativePanel.module.css';
-
-// ── Typing indicator ──────────────────────────────────────
 
 function TypingIndicator() {
   const isDmTyping = useGameStore((s) => s.isDmTyping);
@@ -18,67 +16,47 @@ function TypingIndicator() {
   );
 }
 
-// ── Narrative entry ───────────────────────────────────────
-
-function NarrativeEntry({
-  speaker,
-  speakerLabel,
-  text,
-}: {
-  speaker: 'dm' | 'player';
-  speakerLabel: string;
-  text: string;
+function NarrativeEntry({ speaker, speakerLabel, text }: {
+  speaker: 'dm' | 'player'; speakerLabel: string; text: string;
 }) {
   return (
     <div className={styles.entry}>
-      <div
-        className={[
-          styles.speakerLabel,
-          speaker === 'dm' ? styles.speakerDm : styles.speakerPlayer,
-        ].join(' ')}
-      >
+      <div className={[
+        styles.speakerLabel,
+        speaker === 'dm' ? styles.speakerDm : styles.speakerPlayer,
+      ].join(' ')}>
         {speakerLabel.toUpperCase()}
       </div>
-      <div
-        className={[
-          styles.text,
-          speaker === 'player' ? styles.textPlayer : '',
-        ].join(' ')}
-      >
+      <div className={[styles.text, speaker === 'player' ? styles.textPlayer : ''].join(' ')}>
         {text}
       </div>
     </div>
   );
 }
 
-// ── Quick actions ─────────────────────────────────────────
-
 const QUICK_ACTIONS = [
-  { label: '⚔ ATTACK',       text: 'I attack the nearest enemy with my weapon.' },
-  { label: '🛡 DODGE',        text: 'I use the Dodge action and fall back defensively.' },
-  { label: '✨ CAST SPELL',   text: 'I cast a spell at the enemy.' },
+  { label: '⚔ ATTACK',      text: 'I attack the nearest enemy with my weapon.' },
+  { label: '🛡 DODGE',       text: 'I use the Dodge action and fall back defensively.' },
+  { label: '✨ CAST SPELL',  text: 'I cast a spell at the enemy.' },
   { label: '💚 SECOND WIND', text: 'I use Second Wind to recover hit points.' },
   { label: '👁 INVESTIGATE', text: 'I look around carefully for anything of interest.' },
-  { label: '🏃 DASH',         text: 'I use the Dash action to move quickly.' },
+  { label: '🏃 DASH',        text: 'I use the Dash action to move quickly.' },
 ];
-
-// ── NarrativePanel ────────────────────────────────────────
 
 export function NarrativePanel({ sendAction }: { sendAction: (action: string) => void }) {
   const narrativeHistory = useGameStore((s) => s.narrativeHistory);
   const isDmTyping = useGameStore((s) => s.isDmTyping);
+  const { pendingRoll, consumeRoll } = useDiceStore();
 
   const [inputValue, setInputValue] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Auto-scroll on new entries
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [narrativeHistory.length, isDmTyping]);
 
-  // Auto-resize textarea
   const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInputValue(e.target.value);
     const el = e.target;
@@ -89,11 +67,22 @@ export function NarrativePanel({ sendAction }: { sendAction: (action: string) =>
   const handleSubmit = () => {
     const trimmed = inputValue.trim();
     if (!trimmed || isDmTyping) return;
-    sendAction(trimmed);
-    setInputValue('');
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
+
+    // If there's a pending dice roll, append it to the action
+    let actionText = trimmed;
+    if (pendingRoll && !pendingRoll.usedInAction) {
+      const rollCtx = pendingRoll.isCrit
+        ? `[CRITICAL HIT — rolled ${pendingRoll.total} on ${pendingRoll.expr}]`
+        : pendingRoll.isFumble
+        ? `[CRITICAL FUMBLE — rolled ${pendingRoll.total} on ${pendingRoll.expr}]`
+        : `[rolled ${pendingRoll.total} on ${pendingRoll.expr}]`;
+      actionText = `${trimmed} ${rollCtx}`;
+      consumeRoll();
     }
+
+    sendAction(actionText);
+    setInputValue('');
+    if (textareaRef.current) textareaRef.current.style.height = 'auto';
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -108,12 +97,12 @@ export function NarrativePanel({ sendAction }: { sendAction: (action: string) =>
     textareaRef.current?.focus();
   };
 
+  const isPending = !!pendingRoll && !pendingRoll.usedInAction;
+
   return (
     <div className={styles.root}>
-      {/* Top gradient mask */}
       <div className={styles.topMask} />
 
-      {/* Scrollable narrative */}
       <div className={styles.scroll} ref={scrollRef}>
         {narrativeHistory.map((entry) => (
           <NarrativeEntry key={entry.id} {...entry} />
@@ -121,20 +110,57 @@ export function NarrativePanel({ sendAction }: { sendAction: (action: string) =>
         <TypingIndicator />
       </div>
 
-      {/* Quick actions */}
+      {/* Pending roll banner */}
+      {isPending && (
+        <div style={{
+          padding: '6px 16px',
+          background: pendingRoll!.isCrit
+            ? 'rgba(245,200,66,0.12)'
+            : pendingRoll!.isFumble
+            ? 'rgba(180,40,40,0.12)'
+            : 'rgba(201,162,39,0.08)',
+          borderTop: '0.5px solid var(--color-border)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          flexShrink: 0,
+        }}>
+          <span style={{
+            fontFamily: 'var(--font-display)',
+            fontSize: 11,
+            color: pendingRoll!.isCrit ? '#f5c842'
+              : pendingRoll!.isFumble ? 'var(--color-text-danger)'
+              : 'var(--color-text-gold)',
+            letterSpacing: '0.2em',
+          }}>
+            {pendingRoll!.isCrit ? '⚡ CRITICAL' : pendingRoll!.isFumble ? '💀 FUMBLE' : '🎲 ROLLED'}
+          </span>
+          <span style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 18,
+            color: 'var(--color-text-primary)',
+            fontWeight: 500,
+          }}>
+            {pendingRoll!.total}
+          </span>
+          <span style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 10,
+            color: 'var(--color-text-muted)',
+          }}>
+            {pendingRoll!.expr} · will be included in your next action
+          </span>
+        </div>
+      )}
+
       <div className={styles.quickbar}>
         {QUICK_ACTIONS.map((qa) => (
-          <button
-            key={qa.label}
-            className={styles.quickBtn}
-            onClick={() => handleQuickAction(qa.text)}
-          >
+          <button key={qa.label} className={styles.quickBtn} onClick={() => handleQuickAction(qa.text)}>
             {qa.label}
           </button>
         ))}
       </div>
 
-      {/* Input row */}
       <div className={styles.actionArea}>
         <div className={styles.inputWrap}>
           <textarea
@@ -143,7 +169,11 @@ export function NarrativePanel({ sendAction }: { sendAction: (action: string) =>
             value={inputValue}
             onChange={handleInput}
             onKeyDown={handleKeyDown}
-            placeholder="Describe your action… the realm awaits your command."
+            placeholder={
+              isPending
+                ? `Describe your action… (roll of ${pendingRoll!.total} will be included)`
+                : 'Describe your action… the realm awaits your command.'
+            }
             rows={1}
             disabled={isDmTyping}
           />
