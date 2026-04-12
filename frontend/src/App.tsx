@@ -26,7 +26,9 @@ function GameShell() {
 
   return (
     <div style={ROOT_STYLE}>
-      <TopBar />
+      <TopBar onNewCampaign={function (): void {
+        throw new Error('Function not implemented.');
+      } } />
       <div style={MAIN_STYLE}>
         <LeftPanel />
         <div style={CENTER_STYLE}>

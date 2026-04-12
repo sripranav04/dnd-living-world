@@ -123,3 +123,16 @@
   opacity: 1;
   border-color: var(--color-accent-primary);
 }
+
+.newCampaignBtn {
+  opacity: 0.75;
+  border-color: rgba(180, 40, 40, 0.4);
+  color: var(--color-text-danger);
+}
+
+.newCampaignBtn:hover {
+  opacity: 1;
+  border-color: var(--color-text-danger);
+  background: rgba(180, 40, 40, 0.1);
+  color: var(--color-text-danger);
+}

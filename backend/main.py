@@ -43,46 +43,59 @@ async def health():
 def sse(payload: dict) -> str:
     return f"data: {json.dumps(payload)}\n\n"
 
-# ── Opening scene — called when frontend first loads ──────
-# Streams: world state, party stats, opening narration
-# Frontend calls this on mount before any player input
+def stream_result(narrative: str, ui_instructions: list):
+    """Shared SSE streaming logic — UI instructions first, then narrative."""
+    async def _stream():
+        for instruction in ui_instructions:
+            if instruction.get("type") == "combat_log_entry":
+                yield sse({
+                    "type": "combat_log",
+                    "text": instruction.get("text", ""),
+                    "log_type": instruction.get("log_type", "system"),
+                })
+            else:
+                yield sse({"type": "ui_instruction", "instruction": instruction})
+            await asyncio.sleep(0.05)
+
+        if ui_instructions:
+            await asyncio.sleep(0.25)   # let UI settle before narrative appears
+
+        if narrative:
+            yield sse({
+                "type": "narrative_text",
+                "speaker": "dm",
+                "speaker_label": "Dungeon Master",
+                "text": narrative,
+            })
+    return _stream()
+
+
+# ── Session start ─────────────────────────────────────────
+# Called by frontend on mount.
+# Detects new vs returning session automatically.
 
 @app.get("/game/session/start")
 async def session_start(session_id: str = Query(default="player_one")):
     async def stream():
         yield sse({"type": "stream_start"})
         try:
-            # Run in thread pool so it doesn't block the event loop
-            import asyncio
             loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(None, generate_opening)
+            # Pass session_id so opening_scene can detect new vs returning
+            result = await loop.run_in_executor(
+                None,
+                lambda: generate_opening(session_id),
+            )
 
-            narrative = result.get("narrative", "")
+            narrative       = result.get("narrative", "")
             ui_instructions = result.get("ui_instructions", [])
 
-            # Send UI instructions first — set the scene before text appears
-            for instruction in ui_instructions:
-                if instruction.get("type") == "combat_log_entry":
-                    yield sse({
-                        "type": "combat_log",
-                        "text": instruction.get("text", ""),
-                        "log_type": instruction.get("log_type", "system"),
-                    })
-                else:
-                    yield sse({"type": "ui_instruction", "instruction": instruction})
-                await asyncio.sleep(0.05)
+            # Signal to frontend whether this is a new or returning session
+            from memory.session import is_new_session
+            is_new = await loop.run_in_executor(None, lambda: is_new_session(session_id))
+            yield sse({"type": "session_type", "is_new": is_new})
 
-            # Small pause — let UI render before narrative appears
-            await asyncio.sleep(0.3)
-
-            # Then stream the narrative
-            if narrative:
-                yield sse({
-                    "type": "narrative_text",
-                    "speaker": "dm",
-                    "speaker_label": "Dungeon Master",
-                    "text": narrative,
-                })
+            async for chunk in stream_result(narrative, ui_instructions):
+                yield chunk
 
         except Exception:
             tb = traceback.format_exc()
@@ -97,6 +110,7 @@ async def session_start(session_id: str = Query(default="player_one")):
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"},
     )
 
+
 # ── Player action ─────────────────────────────────────────
 
 @app.get("/game/action")
@@ -107,31 +121,12 @@ async def game_action(
     async def stream():
         yield sse({"type": "stream_start"})
         try:
-            result = await run_turn(_graph, action, session_id)
-            narrative: str = result.get("narrative", "")
-            ui_instructions: list = result.get("ui_instructions", [])
+            result          = await run_turn(_graph, action, session_id)
+            narrative       = result.get("narrative", "")
+            ui_instructions = result.get("ui_instructions", [])
 
-            # UI instructions first — world reacts, then DM narrates
-            for instruction in ui_instructions:
-                if instruction.get("type") == "combat_log_entry":
-                    yield sse({
-                        "type": "combat_log",
-                        "text": instruction.get("text", ""),
-                        "log_type": instruction.get("log_type", "system"),
-                    })
-                else:
-                    yield sse({"type": "ui_instruction", "instruction": instruction})
-                await asyncio.sleep(0.02)
-
-            await asyncio.sleep(0.1)
-
-            if narrative:
-                yield sse({
-                    "type": "narrative_text",
-                    "speaker": "dm",
-                    "speaker_label": "Dungeon Master",
-                    "text": narrative,
-                })
+            async for chunk in stream_result(narrative, ui_instructions):
+                yield chunk
 
         except Exception:
             tb = traceback.format_exc()
@@ -145,3 +140,29 @@ async def game_action(
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"},
     )
+
+
+# ── Session reset (for starting a new campaign) ───────────
+
+@app.delete("/game/session/{session_id}")
+async def reset_session(session_id: str):
+    """
+    Clears Postgres checkpoint for this session_id.
+    Next /game/session/start will treat it as a new session.
+    """
+    try:
+        import psycopg
+        db_url = os.environ["DATABASE_URL"]
+        if "+" in db_url.split("://")[0]:
+            db_url = "postgresql://" + db_url.split("://", 1)[1]
+
+        with psycopg.connect(db_url, autocommit=True) as conn:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM checkpoints WHERE thread_id = %s", (session_id,))
+                cur.execute("DELETE FROM checkpoint_writes WHERE thread_id = %s", (session_id,))
+                deleted = cur.rowcount
+
+        print(f"[reset_session] cleared session {session_id} ({deleted} records)")
+        return {"status": "cleared", "session_id": session_id}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}

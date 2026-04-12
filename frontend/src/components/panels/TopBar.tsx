@@ -2,12 +2,13 @@ import React from 'react';
 import { useGameStore } from '../../store/gameStore';
 import styles from './TopBar.module.css';
 
-const TOP_BUTTONS = ['JOURNAL', 'INVENTORY', 'SPELLS', 'WORLD MAP'];
+interface TopBarProps {
+  onNewCampaign: () => void;
+}
 
-export function TopBar() {
+export function TopBar({ onNewCampaign }: TopBarProps) {
   const theme = useGameStore((s) => s.theme);
   const setTheme = useGameStore((s) => s.setTheme);
-  const world = useGameStore((s) => s.world);
 
   const cycleTheme = () => {
     const themes = ['dark-gothic', 'bright-forest', 'warm-tavern'] as const;
@@ -25,19 +26,21 @@ export function TopBar() {
       <div className={styles.center}>
         <span className={styles.liveTag}>
           <span className={styles.liveDot} />
-          THE MASTER OF THE DUNGEONS IS HERE 
+          THE MASTER OF THE DUNGEONS IS HERE
         </span>
-        {world.inCombat && (
-          <span className={styles.combatTag}>COMBAT ACTIVE</span>
-        )}
       </div>
 
       <div className={styles.right}>
-        {TOP_BUTTONS.map((label) => (
-          <button key={label} className={styles.topBtn}>
-            {label}
-          </button>
-        ))}
+        <button
+          className={`${styles.topBtn} ${styles.newCampaignBtn}`}
+          onClick={onNewCampaign}
+          title="Clear session and start a brand new campaign"
+        >
+          NEW CAMPAIGN
+        </button>
+        <button className={styles.topBtn}>JOURNAL</button>
+        <button className={styles.topBtn}>INVENTORY</button>
+        <button className={styles.topBtn}>SPELLS</button>
         <button
           className={`${styles.topBtn} ${styles.themeBtn}`}
           onClick={cycleTheme}

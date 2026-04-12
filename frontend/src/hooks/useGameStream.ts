@@ -18,10 +18,20 @@ interface CombatLogEvent {
   text: string;
   log_type: 'attack' | 'spell' | 'heal' | 'move' | 'system';
 }
+interface SessionTypeEvent {
+  type: 'session_type';
+  is_new: boolean;
+}
 interface StreamControlEvent { type: 'stream_start' | 'stream_end'; }
 interface ErrorEvent { type: 'error'; message: string; }
 
-type GameSSEEvent = NarrativeEvent | UIInstructionEvent | CombatLogEvent | StreamControlEvent | ErrorEvent;
+type GameSSEEvent =
+  | NarrativeEvent
+  | UIInstructionEvent
+  | CombatLogEvent
+  | SessionTypeEvent
+  | StreamControlEvent
+  | ErrorEvent;
 
 export function useGameStream() {
   const esRef = useRef<EventSource | null>(null);
@@ -45,9 +55,16 @@ export function useGameStream() {
       case 'stream_start':
         setDmTyping(true);
         break;
+
       case 'stream_end':
         setDmTyping(false);
         break;
+
+      case 'session_type':
+        // Log whether this is a new or returning session
+        console.log(`[session] ${event.is_new ? '🆕 New campaign' : '🔄 Returning session'}`);
+        break;
+
       case 'narrative_text':
         setDmTyping(false);
         appendNarrative({
@@ -56,13 +73,16 @@ export function useGameStream() {
           text: event.text,
         });
         break;
+
       case 'ui_instruction':
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         applyUIInstruction(event.instruction as any);
         break;
+
       case 'combat_log':
         appendLog(event.text, event.log_type);
         break;
+
       case 'error':
         console.error('[useGameStream] server error:', event.message);
         setDmTyping(false);
@@ -78,21 +98,22 @@ export function useGameStream() {
     setDmTyping(false);
   }, [setDmTyping]);
 
-  // ── Auto-start: fetch opening scene on mount ────────────
+  // ── Auto-start: fetch opening scene on mount ──────────
   useEffect(() => {
     if (sessionStarted.current) return;
     sessionStarted.current = true;
 
+    const sessionId = new URLSearchParams(window.location.search).get('session') ?? 'player_one';
     const url = new URL(`${API_BASE}/game/session/start`);
-    url.searchParams.set('session_id', 'player_one');
+    url.searchParams.set('session_id', sessionId);
 
     const es = new EventSource(url.toString());
     esRef.current = es;
     es.onmessage = (e) => handleEvent(e.data);
-    es.onerror = () => { es.close(); esRef.current = null; };
-  }, [handleEvent]);
+    es.onerror = () => { es.close(); esRef.current = null; setDmTyping(false); };
+  }, [handleEvent, setDmTyping]);
 
-  // ── Player action ───────────────────────────────────────
+  // ── Player action ─────────────────────────────────────
   const sendAction = useCallback((playerAction: string, sessionId = 'player_one') => {
     close();
 
@@ -118,7 +139,14 @@ export function useGameStream() {
     };
   }, [close, appendNarrative, setDmTyping, handleEvent]);
 
+  // ── New campaign — clears session and reloads ─────────
+  const startNewCampaign = useCallback(async (sessionId = 'player_one') => {
+    close();
+    await fetch(`${API_BASE}/game/session/${sessionId}`, { method: 'DELETE' });
+    window.location.reload();
+  }, [close]);
+
   useEffect(() => () => close(), [close]);
 
-  return { sendAction, close };
+  return { sendAction, startNewCampaign, close };
 }
