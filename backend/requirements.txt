@@ -31,3 +31,5 @@ httpx==0.28.1
 
 # ── AWS SDK (required for Bedrock) ────────────────────────
 boto3>=1.42.0
+
+httpx

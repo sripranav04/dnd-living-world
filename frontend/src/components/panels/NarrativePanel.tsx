@@ -40,18 +40,24 @@ const QUICK_ACTIONS = [
   { label: '🛡 DODGE',       text: 'I use the Dodge action and fall back defensively.' },
   { label: '✨ CAST SPELL',  text: 'I cast a spell at the enemy.' },
   { label: '💚 SECOND WIND', text: 'I use Second Wind to recover hit points.' },
-  { label: '👁 INVESTIGATE', text: 'I look around carefully for anything of interest.' },
+  { label: '🔍 INVESTIGATE', text: 'I look around carefully for anything of interest.' },
   { label: '🏃 DASH',        text: 'I use the Dash action to move quickly.' },
 ];
 
-export function NarrativePanel({ sendAction }: { sendAction: (action: string) => void }) {
-  const narrativeHistory = useGameStore((s) => s.narrativeHistory);
-  const isDmTyping = useGameStore((s) => s.isDmTyping);
+export function NarrativePanel({ sendAction }: {
+  sendAction: (action: string, sessionId?: string, activeCharacter?: string) => void;
+}) {
+  const narrativeHistory   = useGameStore((s) => s.narrativeHistory);
+  const isDmTyping         = useGameStore((s) => s.isDmTyping);
+  const activeCharacterId  = useGameStore((s) => s.activeCharacterId);  // ← new
   const { pendingRoll, consumeRoll } = useDiceStore();
 
   const [inputValue, setInputValue] = useState('');
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollRef   = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Read session_id from URL — matches what useGameStream already does
+  const sessionId = new URLSearchParams(window.location.search).get('session') ?? 'player_one';
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -80,7 +86,9 @@ export function NarrativePanel({ sendAction }: { sendAction: (action: string) =>
       consumeRoll();
     }
 
-    sendAction(actionText);
+    // ── Pass active character so backend enforces turn order ──
+    sendAction(actionText, sessionId, activeCharacterId);
+
     setInputValue('');
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
   };
