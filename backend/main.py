@@ -85,6 +85,10 @@ async def session_start(session_id: str = Query(default="player_one")):
             # Sync turn order — vex goes first
             yield sse({"type": "turn_change", "active_character": "vex"})
 
+            yield sse({"type": "ui_instruction", "instruction": {
+                "type": "update_theme", "theme": "dark-gothic"
+            }})
+
             async for chunk in stream_result(narrative, ui_instructions):
                 yield chunk
 

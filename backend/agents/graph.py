@@ -5,6 +5,7 @@ from state import AgentState
 from agents.dm_agent import dm_node
 from agents.lore_agent import lore_node
 from mechanics.mechanics_node import mechanics_node
+from agents.vibe_architect import vibe_architect_node
 
 # ── In-memory state store (replaces Postgres checkpointer for now) ───
 _session_states: dict = {}
@@ -35,9 +36,10 @@ _DEBUG_PARTY = {
 
 async def build_graph():
     builder = StateGraph(AgentState)
-    builder.add_node("mechanics", mechanics_node)
-    builder.add_node("dm", dm_node)
-    builder.add_node("lore", lore_node)
+    builder.add_node("mechanics",      mechanics_node)
+    builder.add_node("dm",             dm_node)
+    builder.add_node("lore",           lore_node)
+    builder.add_node("vibe_architect", vibe_architect_node)  # ← new
 
     builder.set_entry_point("mechanics")
     builder.add_conditional_edges(
@@ -46,9 +48,9 @@ async def build_graph():
         {"dm": "dm", "end": END},
     )
     builder.add_edge("dm", "lore")
-    builder.add_edge("lore", END)
+    builder.add_edge("lore", "vibe_architect")   # ← lore feeds vibe
+    builder.add_edge("vibe_architect", END)
 
-    # No checkpointer — stateless graph, we manage state ourselves
     return builder.compile()
 
 
@@ -89,7 +91,7 @@ async def run_turn(
     state["messages"]         = clean_messages + [HumanMessage(content=player_action)]
     state["active_character"] = active_character   # who acts NEXT
     state["acting_character"] = active_character   # who IS acting NOW
-    
+
     all_updates = {}
     async for chunk in graph.astream(state, stream_mode="updates"):
         for node_name, updates in chunk.items():

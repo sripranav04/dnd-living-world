@@ -6,12 +6,16 @@ import { useGameStore } from '../store/gameStore';
 // The agent references these by string name in mount_component instructions.
 
 const COMPONENT_MAP: Record<string, React.LazyExoticComponent<React.ComponentType>> = {
-  DungeonScene:      lazy(() => import('./dynamic/DungeonScene')),
-  NarrativeCard:     lazy(() => import('./dynamic/NarrativeCard')),
-  EnvironmentBanner: lazy(() => import('./dynamic/EnvironmentBanner')),
-  CombatHUD:         lazy(() => import('./dynamic/CombatHUD')),
-  LootDisplay:       lazy(() => import('./dynamic/LootDisplay')),
-  SpellEffect:       lazy(() => import('./dynamic/SpellEffect')),
+  DungeonScene:       lazy(() => import('./dynamic/DungeonScene')),
+  DungeonCombatScene: lazy(() => import('./dynamic/DungeonCombatScene')),
+  ForestScene:        lazy(() => import('./dynamic/ForestScene')),
+  ForestCombatScene:  lazy(() => import('./dynamic/ForestCombatScene')),
+  TavernScene:        lazy(() => import('./dynamic/TavernScene')),
+  NarrativeCard:      lazy(() => import('./dynamic/NarrativeCard')),
+  EnvironmentBanner:  lazy(() => import('./dynamic/EnvironmentBanner')),
+  CombatHUD:          lazy(() => import('./dynamic/CombatHUD')),
+  LootDisplay:        lazy(() => import('./dynamic/LootDisplay')),
+  SpellEffect:        lazy(() => import('./dynamic/SpellEffect')),
 };
 
 // ── Fallback ──────────────────────────────────────────────

@@ -1,9 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { useGameStore } from '../../store/gameStore';
 
-// Procedural dungeon scene — rendered in the map viewport
-// Torchlit stone chamber with animated particles and mist
-
 function useAnimatedCanvas(draw: (ctx: CanvasRenderingContext2D, t: number) => void) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef = useRef<number>(0);
@@ -19,7 +16,6 @@ function useAnimatedCanvas(draw: (ctx: CanvasRenderingContext2D, t: number) => v
       canvas.width = rect.width || canvas.parentElement?.clientWidth || 800;
       canvas.height = rect.height || canvas.parentElement?.clientHeight || 500;
     };
-    // Use ResizeObserver for reliable size detection
     const ro = new ResizeObserver(resize);
     ro.observe(canvas);
     resize();
@@ -44,139 +40,213 @@ function useAnimatedCanvas(draw: (ctx: CanvasRenderingContext2D, t: number) => v
   return canvasRef;
 }
 
-export default function DungeonScene() {
-  const world = useGameStore((s) => s.world);
-  const theme = useGameStore((s) => s.theme);
+function getCSSVar(name: string, fallback = '#888888'): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+}
 
-  // Theme-based colours
-  const palette = theme === 'bright-forest'
-    ? { sky: '#0a1a0c', floor: '#111d14', wall: '#0d1a0f', torch: '#80e060', mist: 'rgba(80,160,80,0.04)', particle: '#a8d4a0' }
-    : theme === 'warm-tavern'
-    ? { sky: '#100a04', floor: '#1a1008', wall: '#0c0802', torch: '#ff8820', mist: 'rgba(180,100,20,0.04)', particle: '#d4926a' }
-    : { sky: '#08070a', floor: '#111009', wall: '#0e0b07', torch: '#f5a623', mist: 'rgba(100,80,50,0.04)', particle: '#c9a227' };
+export default function DungeonScene() {
+  const locationName = useGameStore((s) => s.world.locationName);
 
   const draw = React.useCallback((ctx: CanvasRenderingContext2D, t: number) => {
     const W = ctx.canvas.width;
     const H = ctx.canvas.height;
     if (W === 0 || H === 0) return;
 
-    // Background
-    ctx.fillStyle = palette.sky;
+    const bg      = getCSSVar('--color-bg-base',        '#08070a');
+    const wall    = getCSSVar('--map-wall-color',       '#0e0b07');
+    const floor   = getCSSVar('--map-floor-color',      '#111009');
+    const torch   = getCSSVar('--torch-color',          '#f5a623');
+    const accent  = getCSSVar('--color-accent-primary', '#c9a227');
+    const grid    = getCSSVar('--map-grid-color',       'rgba(201,162,39,0.06)');
+
+    // ── Sky / ceiling ──────────────────────────────────────
+    ctx.fillStyle = bg;
     ctx.fillRect(0, 0, W, H);
 
-    // Stone walls (top, bottom, sides)
-    ctx.fillStyle = palette.wall;
-    ctx.fillRect(0, 0, W, H * 0.18);               // top wall
-    ctx.fillRect(0, H * 0.82, W, H * 0.18);        // bottom wall
-    ctx.fillRect(0, H * 0.18, W * 0.14, H * 0.64); // left wall
-    ctx.fillRect(W * 0.86, H * 0.18, W * 0.14, H * 0.64); // right wall
+    // ── First-person corridor walls ────────────────────────
+    // Left wall receding into distance
+    ctx.fillStyle = wall;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(W * 0.35, H * 0.25);
+    ctx.lineTo(W * 0.35, H * 0.75);
+    ctx.lineTo(0, H);
+    ctx.closePath();
+    ctx.fill();
 
-    // Floor with stone tile pattern
-    ctx.fillStyle = palette.floor;
-    ctx.fillRect(W * 0.14, H * 0.18, W * 0.72, H * 0.64);
+    // Right wall receding into distance
+    ctx.beginPath();
+    ctx.moveTo(W, 0);
+    ctx.lineTo(W * 0.65, H * 0.25);
+    ctx.lineTo(W * 0.65, H * 0.75);
+    ctx.lineTo(W, H);
+    ctx.closePath();
+    ctx.fill();
 
-    // Stone tile lines
-    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+    // Ceiling
+    ctx.fillStyle = wall;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(W, 0);
+    ctx.lineTo(W * 0.65, H * 0.25);
+    ctx.lineTo(W * 0.35, H * 0.25);
+    ctx.closePath();
+    ctx.fill();
+
+    // Floor
+    ctx.fillStyle = floor;
+    ctx.beginPath();
+    ctx.moveTo(0, H);
+    ctx.lineTo(W, H);
+    ctx.lineTo(W * 0.65, H * 0.75);
+    ctx.lineTo(W * 0.35, H * 0.75);
+    ctx.closePath();
+    ctx.fill();
+
+    // ── Stone block lines on walls ─────────────────────────
+    ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+    ctx.lineWidth = 0.8;
+
+    // Left wall blocks
+    for (let row = 0; row < 5; row++) {
+      const y0 = (row / 5) * H;
+      const y1 = ((row + 1) / 5) * H;
+      const xLeft0 = W * 0.35 * (1 - row / 5);
+      const xLeft1 = W * 0.35 * (1 - (row + 1) / 5);
+      ctx.beginPath();
+      ctx.moveTo(xLeft0, y0);
+      ctx.lineTo(xLeft1, y1);
+      ctx.stroke();
+    }
+
+    // Right wall blocks
+    for (let row = 0; row < 5; row++) {
+      const y0 = (row / 5) * H;
+      const y1 = ((row + 1) / 5) * H;
+      const xRight0 = W - W * 0.35 * (1 - row / 5);
+      const xRight1 = W - W * 0.35 * (1 - (row + 1) / 5);
+      ctx.beginPath();
+      ctx.moveTo(xRight0, y0);
+      ctx.lineTo(xRight1, y1);
+      ctx.stroke();
+    }
+
+    // Floor perspective lines
+    ctx.strokeStyle = grid;
     ctx.lineWidth = 0.5;
-    const tileW = W * 0.72 / 8;
-    const tileH = H * 0.64 / 6;
-    for (let col = 0; col <= 8; col++) {
+    const floorVanishX = W * 0.5;
+    const floorVanishY = H * 0.75;
+    for (let i = 0; i <= 8; i++) {
+      const startX = (i / 8) * W;
       ctx.beginPath();
-      ctx.moveTo(W * 0.14 + col * tileW, H * 0.18);
-      ctx.lineTo(W * 0.14 + col * tileW, H * 0.82);
+      ctx.moveTo(startX, H);
+      ctx.lineTo(floorVanishX, floorVanishY);
       ctx.stroke();
     }
-    for (let row = 0; row <= 6; row++) {
+    for (let i = 0; i <= 4; i++) {
+      const progress = i / 4;
+      const x0 = W * 0.35 + progress * (W * 0.15);
+      const x1 = W * 0.65 - progress * (W * 0.15);
+      const y = H * 0.75 + progress * (H * 0.25);
       ctx.beginPath();
-      ctx.moveTo(W * 0.14, H * 0.18 + row * tileH);
-      ctx.lineTo(W * 0.86, H * 0.18 + row * tileH);
+      ctx.moveTo(x0, y);
+      ctx.lineTo(x1, y);
       ctx.stroke();
     }
 
-    // Torches with flickering glow
-    const torchPositions = [
-      { x: W * 0.16, y: H * 0.24 },
-      { x: W * 0.84, y: H * 0.24 },
-      { x: W * 0.16, y: H * 0.76 },
-      { x: W * 0.84, y: H * 0.76 },
+    // ── End of corridor — doorway glow ────────────────────
+    const vanishX = W * 0.5;
+    const vanishY = H * 0.5;
+    const doorW = W * 0.3;
+    const doorH = H * 0.5;
+
+    // Door frame
+    ctx.strokeStyle = accent + '44';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(vanishX - doorW / 2, vanishY - doorH / 2, doorW, doorH);
+
+    // Glow from beyond
+    const doorGlow = ctx.createRadialGradient(vanishX, vanishY, 0, vanishX, vanishY, doorW);
+    doorGlow.addColorStop(0, torch + '22');
+    doorGlow.addColorStop(0.5, torch + '08');
+    doorGlow.addColorStop(1, 'transparent');
+    ctx.fillStyle = doorGlow;
+    ctx.fillRect(vanishX - doorW, vanishY - doorH, doorW * 2, doorH * 2);
+
+    // ── Wall torches ──────────────────────────────────────
+    const torches = [
+      { x: W * 0.33, y: H * 0.35 },
+      { x: W * 0.67, y: H * 0.35 },
     ];
 
-    torchPositions.forEach((pos, i) => {
-      const flicker = 1 + 0.15 * Math.sin(t * 12 + i * 2.3);
-      const glowR = 80 * flicker;
+    torches.forEach((pos, i) => {
+      const flicker = 1 + 0.2 * Math.sin(t * 11 + i * 2.7);
+      const glowR = 90 * flicker;
+
+      // Wall mount bracket
+      ctx.fillStyle = accent + '66';
+      ctx.fillRect(pos.x - 3, pos.y, 6, 12);
 
       // Glow
-      const grad = ctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, glowR);
-      grad.addColorStop(0, palette.torch.replace(')', ', 0.3)').replace('rgb', 'rgba'));
-      grad.addColorStop(1, 'transparent');
-      ctx.fillStyle = grad;
+      const g = ctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, glowR);
+      g.addColorStop(0, torch + '55');
+      g.addColorStop(0.4, torch + '18');
+      g.addColorStop(1, 'transparent');
+      ctx.fillStyle = g;
       ctx.beginPath();
       ctx.arc(pos.x, pos.y, glowR, 0, Math.PI * 2);
       ctx.fill();
 
       // Flame
-      ctx.fillStyle = palette.torch;
+      ctx.fillStyle = torch;
       ctx.beginPath();
-      ctx.ellipse(pos.x, pos.y - 2, 4 * flicker, 7 * flicker, 0, 0, Math.PI * 2);
+      ctx.ellipse(pos.x, pos.y - 6, 5 * flicker, 9 * flicker, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Inner flame
+      ctx.fillStyle = '#ffffff55';
+      ctx.beginPath();
+      ctx.ellipse(pos.x, pos.y - 6, 2, 4 * flicker, 0, 0, Math.PI * 2);
       ctx.fill();
     });
 
-    // Grid overlay
-    ctx.strokeStyle = `rgba(201,162,39,0.06)`;
-    ctx.lineWidth = 0.5;
-    const gridSize = Math.min(W, H) * 0.08;
-    for (let x = W * 0.14; x <= W * 0.86; x += gridSize) {
-      ctx.beginPath();
-      ctx.moveTo(x, H * 0.18);
-      ctx.lineTo(x, H * 0.82);
-      ctx.stroke();
-    }
-    for (let y = H * 0.18; y <= H * 0.82; y += gridSize) {
-      ctx.beginPath();
-      ctx.moveTo(W * 0.14, y);
-      ctx.lineTo(W * 0.86, y);
-      ctx.stroke();
+    // ── Mist on floor ─────────────────────────────────────
+    for (let i = 0; i < 5; i++) {
+      const px = W * 0.2 + Math.sin(t * 0.25 + i * 1.3) * W * 0.35;
+      const py = H * 0.82 + Math.cos(t * 0.18 + i * 0.9) * H * 0.06;
+      const gr = ctx.createRadialGradient(px, py, 0, px, py, 70);
+      gr.addColorStop(0, accent + '0d');
+      gr.addColorStop(1, 'transparent');
+      ctx.fillStyle = gr;
+      ctx.fillRect(px - 70, py - 30, 140, 60);
     }
 
-    // Mist particles
-    for (let i = 0; i < 6; i++) {
-      const px = W * 0.2 + Math.sin(t * 0.3 + i * 1.1) * W * 0.3;
-      const py = H * 0.5 + Math.cos(t * 0.2 + i * 0.7) * H * 0.2;
-      const grad2 = ctx.createRadialGradient(px, py, 0, px, py, 60);
-      grad2.addColorStop(0, palette.mist);
-      grad2.addColorStop(1, 'transparent');
-      ctx.fillStyle = grad2;
-      ctx.fillRect(px - 60, py - 60, 120, 120);
-    }
-
-    // Floating dust particles
-    for (let i = 0; i < 20; i++) {
-      const px = W * 0.15 + ((i * 137.5 + t * 10) % (W * 0.7));
-      const py = H * 0.82 - ((i * 73 + t * 5) % (H * 0.6));
-      const alpha = 0.2 + 0.3 * Math.sin(t + i);
-      ctx.fillStyle = palette.particle.replace(')', `, ${alpha})`).includes('rgba')
-        ? palette.particle
-        : `rgba(201,162,39,${alpha})`;
+    // ── Dust motes floating ───────────────────────────────
+    for (let i = 0; i < 18; i++) {
+      const px = W * 0.2 + ((i * 149 + t * 8) % (W * 0.6));
+      const py = H * 0.25 + ((i * 83 + t * 3) % (H * 0.5));
+      const alpha = 0.15 + 0.25 * Math.sin(t * 0.8 + i);
+      const alphaHex = Math.round(alpha * 255).toString(16).padStart(2, '0');
+      ctx.fillStyle = accent + alphaHex;
       ctx.beginPath();
-      ctx.arc(px, py, 0.8, 0, Math.PI * 2);
+      ctx.arc(px, py, 0.9, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    // Vignette
-    const vign = ctx.createRadialGradient(W / 2, H / 2, H * 0.2, W / 2, H / 2, H * 0.8);
+    // ── Vignette ──────────────────────────────────────────
+    const vign = ctx.createRadialGradient(W / 2, H / 2, H * 0.15, W / 2, H / 2, H * 0.85);
     vign.addColorStop(0, 'transparent');
-    vign.addColorStop(1, 'rgba(8,6,10,0.88)');
+    vign.addColorStop(1, bg + 'f2');
     ctx.fillStyle = vign;
     ctx.fillRect(0, 0, W, H);
 
-    // Location label
-    ctx.fillStyle = 'rgba(201,162,39,0.7)';
+    // ── Location label ────────────────────────────────────
+    ctx.fillStyle = accent + 'cc';
     ctx.font = `11px 'Cinzel', serif`;
     ctx.textAlign = 'center';
-    ctx.letterSpacing = '0.3em';
-    ctx.fillText(`◆  ${world.locationName.toUpperCase()}  ◆`, W / 2, 28);
+    ctx.fillText(`◆  ${locationName.toUpperCase()}  ◆`, W / 2, 22);
 
-  }, [palette, world.locationName]);
+  }, [locationName]);
 
   const canvasRef = useAnimatedCanvas(draw);
 

@@ -12,8 +12,8 @@ def get_llm() -> BaseChatModel:
     """
     global _instances
 
-    provider = os.environ.get("LLM_PROVIDER", "aws").lower()
-    app_env  = os.environ.get("APP_ENV", "dev").lower()   # "dev" or "prod"
+    provider  = os.environ.get("LLM_PROVIDER", "aws").lower()
+    app_env   = os.environ.get("APP_ENV", "dev").lower()
     cache_key = f"{provider}:{app_env}"
 
     if cache_key in _instances:
@@ -23,19 +23,18 @@ def get_llm() -> BaseChatModel:
         from langchain_openai import AzureChatOpenAI
 
         deployment = (
-            os.environ.get("AZURE_DEPLOYMENT_DEV", "gpt-4o-mini")
+            os.environ.get("AZURE_DEPLOYMENT_DEV", "gpt-5.4")
             if app_env == "dev"
-            else os.environ.get("AZURE_DEPLOYMENT_PROD", "gpt-4o")
+            else os.environ.get("AZURE_DEPLOYMENT_PROD", "gpt-5.4")
         )
 
         llm = AzureChatOpenAI(
             azure_deployment=deployment,
             azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT"],
             api_key=os.environ["AZURE_OPENAI_API_KEY"],
-            api_version=os.environ.get("AZURE_OPENAI_API_VERSION", "2024-02-01"),
+            api_version=os.environ.get("AZURE_OPENAI_API_VERSION", "2024-12-01-preview"),
             temperature=float(os.environ.get("LLM_TEMPERATURE", "0.8")),
-            max_tokens=int(os.environ.get("LLM_MAX_TOKENS", "1024")),
-            model_kwargs={"response_format": {"type": "json_object"}},
+            max_tokens=int(os.environ.get("LLM_MAX_TOKENS", "2048")),
         )
         print(f"[llm_provider] Azure OpenAI · deployment={deployment} · env={app_env}")
 
@@ -52,7 +51,7 @@ def get_llm() -> BaseChatModel:
             model=model_id,
             region_name=os.environ.get("AWS_REGION", "us-east-1"),
             temperature=float(os.environ.get("LLM_TEMPERATURE", "0.8")),
-            max_tokens=int(os.environ.get("LLM_MAX_TOKENS", "1024")),
+            max_tokens=int(os.environ.get("LLM_MAX_TOKENS", "2048")),
         )
         print(f"[llm_provider] AWS Bedrock · model={model_id} · env={app_env}")
 
