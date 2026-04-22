@@ -14,16 +14,32 @@ DYNAMIC_COMPONENTS_DIR = Path(
     )
 )
 
-VIBE_SYSTEM = """You write React canvas components. Output ONLY the complete .tsx file, nothing else.
+VIBE_SYSTEM = """You write React TypeScript canvas components for a D&D game. Output ONLY the complete .tsx file.
 
-STRICT RULES:
-- Every { must have a matching }
-- Every ( must have a matching )
-- The file must be complete — no truncation
-- Use getCSSVar() for ALL colors, never hardcode hex
-- Keep the draw function SHORT — max 40 lines inside it
+STRICT RULES — violations cause parse errors:
+- Every opening { must have a matching closing }
+- Every opening ( must have a matching closing )  
+- The file must be 100% complete — never truncate
+- Use getCSSVar() for ALL colors — never hardcode hex values
+- Count your braces before finishing
 
-EXACT TEMPLATE (replace COMPONENT_NAME and fill draw body only):
+DRAWING QUALITY REQUIREMENTS:
+- Characters must look like silhouettes, NOT stick figures
+- Use filled shapes: ellipses for head/body/limbs, NOT lines
+- Characters must be DARK colored (use bg color + 'dd' opacity) so they look like silhouettes
+- Enemy must look menacing and different from the character
+- Background must have depth: gradient sky, floor, environment details
+- Add atmospheric effects: torch glows, mist, particles
+- Animate smoothly with Math.sin(t) — idle breathing, weapon swings, enemy hover
+
+CHARACTER SILHOUETTE TECHNIQUE (filled shapes, NOT lines):
+Fighter: large ellipse body, circle head, thick rectangle sword arm raised
+Rogue: crouched ellipse body, circle head, two small dagger rectangles
+Wizard: tall ellipse body with robe flare, circle head, staff rectangle raised  
+Cleric: broad ellipse body, circle head, holy symbol circle in front
+Enemy wraith: wispy tall ellipse body, large circle head, tendril curves emanating outward
+
+EXACT TEMPLATE — replace COMPONENT_NAME, fill draw function body:
 
 import React, { useEffect, useRef, useCallback } from 'react';
 import { useGameStore } from '../../store/gameStore';
@@ -43,7 +59,9 @@ export default function COMPONENT_NAME() {
     const bg = getCSSVar('--color-bg-base', '#08070a');
     const accent = getCSSVar('--color-accent-primary', '#c9a227');
     const torch = getCSSVar('--torch-color', '#f5a623');
-    // FILL DRAW BODY HERE — keep under 40 lines
+    const wall = getCSSVar('--map-wall-color', '#0e0b07');
+    const floor = getCSSVar('--map-floor-color', '#111009');
+    // DRAW BODY HERE — use filled shapes for silhouettes, gradient backgrounds
   }, [locationName]);
 
   useEffect(() => {
@@ -64,7 +82,7 @@ export default function COMPONENT_NAME() {
   return <canvas ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block' }} />;
 }
 
-# OUTPUT THE COMPLETE FILE. Count your braces before responding."""
+OUTPUT THE COMPLETE FILE. Count every { and } before responding."""
 def generate_scene_component(
     scene_name: str,
     world: dict,

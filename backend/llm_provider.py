@@ -34,7 +34,7 @@ def get_llm() -> BaseChatModel:
             api_key=os.environ["AZURE_OPENAI_API_KEY"],
             api_version=os.environ.get("AZURE_OPENAI_API_VERSION", "2024-12-01-preview"),
             temperature=float(os.environ.get("LLM_TEMPERATURE", "0.8")),
-            max_tokens=int(os.environ.get("LLM_MAX_TOKENS", "2048")),
+            max_completion_tokens=int(os.environ.get("LLM_max_completion_tokens", "2048")),
         )
         print(f"[llm_provider] Azure OpenAI · deployment={deployment} · env={app_env}")
 
@@ -51,7 +51,7 @@ def get_llm() -> BaseChatModel:
             model=model_id,
             region_name=os.environ.get("AWS_REGION", "us-east-1"),
             temperature=float(os.environ.get("LLM_TEMPERATURE", "0.8")),
-            max_tokens=int(os.environ.get("LLM_MAX_TOKENS", "2048")),
+            max_completion_tokens=int(os.environ.get("LLM_max_completion_tokens", "2048")),
         )
         print(f"[llm_provider] AWS Bedrock · model={model_id} · env={app_env}")
 
