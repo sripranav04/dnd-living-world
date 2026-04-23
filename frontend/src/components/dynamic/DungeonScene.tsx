@@ -36,55 +36,55 @@ export default function DungeonScene() {
     if (impactRef.current > 0) impactRef.current = Math.max(0, impactRef.current - 0.022);
     const impact = impactRef.current;
     // DRAW BODY HERE
-    const vx = W * 0.5;
-    const vy = H * 0.45;
+    const vpX = W * 0.5;
+    const vpY = H * 0.45;
 
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, W, H);
 
-    const ceilGrad = ctx.createLinearGradient(0, 0, 0, vy);
-    ceilGrad.addColorStop(0, wall);
-    ceilGrad.addColorStop(1, bg);
-    ctx.fillStyle = ceilGrad;
+    const ceilingGrad = ctx.createLinearGradient(0, 0, 0, vpY);
+    ceilingGrad.addColorStop(0, wall);
+    ceilingGrad.addColorStop(1, bg);
+    ctx.fillStyle = ceilingGrad;
     ctx.beginPath();
     ctx.moveTo(0, 0);
     ctx.lineTo(W, 0);
-    ctx.lineTo(vx + W * 0.12, vy);
-    ctx.lineTo(vx - W * 0.12, vy);
+    ctx.lineTo(vpX + W * 0.08, vpY);
+    ctx.lineTo(vpX - W * 0.08, vpY);
     ctx.closePath();
     ctx.fill();
 
-    const leftWallGrad = ctx.createLinearGradient(0, 0, vx, 0);
+    const leftWallGrad = ctx.createLinearGradient(0, 0, vpX, 0);
     leftWallGrad.addColorStop(0, wall);
     leftWallGrad.addColorStop(1, bg);
     ctx.fillStyle = leftWallGrad;
     ctx.beginPath();
     ctx.moveTo(0, 0);
-    ctx.lineTo(vx - W * 0.12, vy);
-    ctx.lineTo(vx - W * 0.18, H);
+    ctx.lineTo(vpX - W * 0.08, vpY);
+    ctx.lineTo(vpX - W * 0.12, H);
     ctx.lineTo(0, H);
     ctx.closePath();
     ctx.fill();
 
-    const rightWallGrad = ctx.createLinearGradient(W, 0, vx, 0);
+    const rightWallGrad = ctx.createLinearGradient(W, 0, vpX, 0);
     rightWallGrad.addColorStop(0, wall);
     rightWallGrad.addColorStop(1, bg);
     ctx.fillStyle = rightWallGrad;
     ctx.beginPath();
     ctx.moveTo(W, 0);
-    ctx.lineTo(vx + W * 0.12, vy);
-    ctx.lineTo(vx + W * 0.18, H);
+    ctx.lineTo(vpX + W * 0.08, vpY);
+    ctx.lineTo(vpX + W * 0.12, H);
     ctx.lineTo(W, H);
     ctx.closePath();
     ctx.fill();
 
-    const floorGrad = ctx.createLinearGradient(0, vy, 0, H);
+    const floorGrad = ctx.createLinearGradient(0, vpY, 0, H);
     floorGrad.addColorStop(0, bg);
     floorGrad.addColorStop(1, floorC);
     ctx.fillStyle = floorGrad;
     ctx.beginPath();
-    ctx.moveTo(vx - W * 0.12, vy);
-    ctx.lineTo(vx + W * 0.12, vy);
+    ctx.moveTo(vpX - W * 0.08, vpY);
+    ctx.lineTo(vpX + W * 0.08, vpY);
     ctx.lineTo(W, H);
     ctx.lineTo(0, H);
     ctx.closePath();
@@ -92,17 +92,18 @@ export default function DungeonScene() {
 
     ctx.strokeStyle = accent + '22';
     ctx.lineWidth = 1;
-    for (let i = -8; i <= 8; i++) {
-      const x = vx + i * (W * 0.08);
+    for (let i = -7; i <= 7; i++) {
+      const x = vpX + i * (W * 0.08);
       ctx.beginPath();
       ctx.moveTo(x, H);
-      ctx.lineTo(vx, vy);
+      ctx.lineTo(vpX, vpY);
       ctx.stroke();
     }
 
-    for (let i = 0; i < 8; i++) {
-      const y = vy + ((H - vy) * i) / 8;
-      const inset = ((y - vy) / (H - vy)) * W * 0.5;
+    for (let i = 1; i <= 8; i++) {
+      const p = i / 9;
+      const y = vpY + (H - vpY) * p * p;
+      const inset = (W * 0.5) * (1 - p * 0.9);
       ctx.strokeStyle = accent + '18';
       ctx.beginPath();
       ctx.moveTo(inset, y);
@@ -110,129 +111,143 @@ export default function DungeonScene() {
       ctx.stroke();
     }
 
-    const torchFlickerL = 0.85 + Math.sin(t * 7.1) * 0.08 + Math.sin(t * 13.7) * 0.05;
-    const torchFlickerR = 0.85 + Math.sin(t * 6.4 + 1.2) * 0.08 + Math.sin(t * 11.9 + 0.7) * 0.05;
-
-    const drawTorch = (x: number, y: number, flicker: number, side: 'left' | 'right') => {
-      const glow = ctx.createRadialGradient(x, y, 0, x, y, H * 0.18);
+    const drawTorch = (x: number, y: number, side: 'left' | 'right') => {
+      const flicker = 0.9 + Math.sin(t * 8 + x * 0.01) * 0.08 + Math.sin(t * 17 + y * 0.02) * 0.05;
+      const glow = ctx.createRadialGradient(x, y, 0, x, y, H * 0.16);
       glow.addColorStop(0, torch + '88');
       glow.addColorStop(0.35, torch + '33');
       glow.addColorStop(1, torch + '00');
       ctx.fillStyle = glow;
       ctx.beginPath();
-      ctx.arc(x, y, H * 0.18, 0, Math.PI * 2);
+      ctx.arc(x, y, H * 0.16, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.strokeStyle = accent;
+      ctx.strokeStyle = accent + '88';
       ctx.lineWidth = Math.max(2, W * 0.004);
       ctx.beginPath();
       if (side === 'left') {
-        ctx.moveTo(x + W * 0.03, y - H * 0.02);
+        ctx.moveTo(x - W * 0.03, y);
         ctx.lineTo(x, y);
-        ctx.lineTo(x + W * 0.03, y + H * 0.02);
       } else {
-        ctx.moveTo(x - W * 0.03, y - H * 0.02);
+        ctx.moveTo(x + W * 0.03, y);
         ctx.lineTo(x, y);
-        ctx.lineTo(x - W * 0.03, y + H * 0.02);
       }
       ctx.stroke();
 
-      ctx.fillStyle = wall;
-      ctx.fillRect(x - W * 0.008, y - H * 0.018, W * 0.016, H * 0.036);
+      ctx.fillStyle = accent;
+      ctx.beginPath();
+      ctx.arc(x, y, H * 0.012, 0, Math.PI * 2);
+      ctx.fill();
 
       ctx.fillStyle = torch + 'dd';
       ctx.beginPath();
-      ctx.ellipse(x, y - H * 0.018, W * 0.008 * flicker, H * 0.022 * flicker, 0, 0, Math.PI * 2);
+      ctx.ellipse(x, y - H * 0.018, W * 0.01 * flicker, H * 0.03 * flicker, 0, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.fillStyle = accent + 'cc';
       ctx.beginPath();
-      ctx.ellipse(x, y - H * 0.012, W * 0.004, H * 0.012, 0, 0, Math.PI * 2);
+      ctx.ellipse(x, y - H * 0.028, W * 0.004 * flicker, H * 0.014 * flicker, 0, 0, Math.PI * 2);
       ctx.fill();
     };
 
-    drawTorch(W * 0.16, H * 0.3, torchFlickerL, 'left');
-    drawTorch(W * 0.84, H * 0.3, torchFlickerR, 'right');
+    drawTorch(W * 0.18, H * 0.3, 'left');
+    drawTorch(W * 0.82, H * 0.3, 'right');
 
-    const mist = ctx.createLinearGradient(0, vy, 0, H);
-    mist.addColorStop(0, bg + '00');
-    mist.addColorStop(0.5, accent + '08');
-    mist.addColorStop(1, bg + '22');
-    ctx.fillStyle = mist;
-    ctx.fillRect(0, vy, W, H - vy);
+    ctx.strokeStyle = accent + '14';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 7; i++) {
+      const p = i / 7;
+      const yTop = vpY * p;
+      const leftX = vpX - (vpX * (1 - p * 0.85));
+      const rightX = vpX + ((W - vpX) * (1 - p * 0.85));
+      ctx.beginPath();
+      ctx.moveTo(leftX, yTop);
+      ctx.lineTo(leftX, H * 0.95);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(rightX, yTop);
+      ctx.lineTo(rightX, H * 0.95);
+      ctx.stroke();
+    }
 
-    for (let i = 0; i < 18; i++) {
-      const px = ((i * 73.17 + t * 12) % (W + 40)) - 20;
-      const py = vy + (((i * 41.23 + t * 7) % (H - vy + 60)) - 30);
-      const r = 1 + (i % 3);
-      ctx.fillStyle = accent + '33';
+    const mistLayers = 4;
+    for (let i = 0; i < mistLayers; i++) {
+      const my = H * (0.58 + i * 0.08) + Math.sin(t * (0.4 + i * 0.15) + i) * 8;
+      const mist = ctx.createLinearGradient(0, my - H * 0.05, 0, my + H * 0.05);
+      mist.addColorStop(0, bg + '00');
+      mist.addColorStop(0.5, accent + '10');
+      mist.addColorStop(1, bg + '00');
+      ctx.fillStyle = mist;
+      ctx.fillRect(0, my - H * 0.05, W, H * 0.1);
+    }
+
+    for (let i = 0; i < 36; i++) {
+      const px = ((i * 97.13 + t * (8 + (i % 5))) % (W + 40)) - 20;
+      const py = (H * 0.15 + ((i * 53.71 + t * (12 + (i % 7) * 2)) % (H * 0.7)));
+      const r = 0.8 + (i % 3) * 0.6;
+      ctx.fillStyle = accent + '22';
       ctx.beginPath();
       ctx.arc(px, py, r, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    const shadowY = H * 0.5;
-    const shadowGlow = ctx.createRadialGradient(vx, shadowY, 0, vx, shadowY, H * 0.12);
-    shadowGlow.addColorStop(0, bg + '66');
-    shadowGlow.addColorStop(1, bg + '00');
-    ctx.fillStyle = shadowGlow;
+    const shadowAlpha = 0.18 + Math.sin(t * 0.7) * 0.03;
+    ctx.fillStyle = bg + '00';
+    const distantGlow = ctx.createRadialGradient(vpX, H * 0.58, 0, vpX, H * 0.58, H * 0.18);
+    distantGlow.addColorStop(0, accent + '10');
+    distantGlow.addColorStop(1, accent + '00');
+    ctx.fillStyle = distantGlow;
     ctx.beginPath();
-    ctx.ellipse(vx, shadowY, W * 0.08, H * 0.12, 0, 0, Math.PI * 2);
+    ctx.arc(vpX, H * 0.58, H * 0.18, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.fillStyle = bg + 'aa';
+    ctx.fillStyle = wall + Math.round(Math.max(0, Math.min(255, shadowAlpha * 255))).toString(16).padStart(2, '0');
     ctx.beginPath();
-    ctx.moveTo(vx, H * 0.38);
-    ctx.lineTo(vx - W * 0.018, H * 0.47);
-    ctx.lineTo(vx - W * 0.01, H * 0.56);
-    ctx.lineTo(vx + W * 0.01, H * 0.56);
-    ctx.lineTo(vx + W * 0.018, H * 0.47);
-    ctx.closePath();
+    ctx.moveTo(vpX - W * 0.018, H * 0.62);
+    ctx.quadraticCurveTo(vpX - W * 0.01, H * 0.54, vpX - W * 0.006, H * 0.5);
+    ctx.quadraticCurveTo(vpX, H * 0.46, vpX + W * 0.006, H * 0.5);
+    ctx.quadraticCurveTo(vpX + W * 0.01, H * 0.54, vpX + W * 0.018, H * 0.62);
+    ctx.quadraticCurveTo(vpX, H * 0.64, vpX - W * 0.018, H * 0.62);
     ctx.fill();
 
-    ctx.fillStyle = wall + '88';
+    ctx.fillStyle = accent + '18';
     ctx.beginPath();
-    ctx.arc(vx, H * 0.41, W * 0.018, Math.PI, 0);
+    ctx.ellipse(vpX, H * 0.63, W * 0.03, H * 0.01, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    const handBob = Math.sin(t * 1.2) * 4;
+    const handY = H * 0.92 + Math.sin(t * 1.6) * 2;
     ctx.fillStyle = wall;
     ctx.beginPath();
     ctx.moveTo(W * 0.44, H);
-    ctx.lineTo(W * 0.47, H * 0.88 + handBob);
-    ctx.lineTo(W * 0.53, H * 0.88 + handBob);
-    ctx.lineTo(W * 0.56, H);
+    ctx.quadraticCurveTo(W * 0.455, handY - H * 0.03, W * 0.475, handY - H * 0.015);
+    ctx.lineTo(W * 0.49, handY);
+    ctx.lineTo(W * 0.51, handY);
+    ctx.quadraticCurveTo(W * 0.545, handY - H * 0.03, W * 0.56, H);
     ctx.closePath();
     ctx.fill();
-
-    ctx.strokeStyle = accent + '88';
-    ctx.lineWidth = Math.max(2, W * 0.004);
-    ctx.beginPath();
-    ctx.moveTo(W * 0.5, H * 0.88 + handBob);
-    ctx.lineTo(W * 0.5, H * 0.76 + handBob);
-    ctx.stroke();
 
     ctx.fillStyle = accent + '66';
     ctx.beginPath();
-    ctx.moveTo(W * 0.495, H * 0.76 + handBob);
-    ctx.lineTo(W * 0.505, H * 0.76 + handBob);
-    ctx.lineTo(W * 0.5, H * 0.72 + handBob);
+    ctx.moveTo(W * 0.495, handY - H * 0.06);
+    ctx.lineTo(W * 0.505, handY - H * 0.06);
+    ctx.lineTo(W * 0.515, handY - H * 0.005);
+    ctx.lineTo(W * 0.485, handY - H * 0.005);
     ctx.closePath();
     ctx.fill();
+
+    const vignette = ctx.createRadialGradient(vpX, H * 0.5, H * 0.2, vpX, H * 0.5, H * 0.8);
+    vignette.addColorStop(0, bg + '00');
+    vignette.addColorStop(1, bg + '77');
+    ctx.fillStyle = vignette;
+    ctx.fillRect(0, 0, W, H);
 
     if (state === 'attack') {
       ctx.fillStyle = '#ff000022';
       ctx.fillRect(0, 0, W, H);
     }
 
-    const vignette = ctx.createRadialGradient(vx, H * 0.5, H * 0.25, vx, H * 0.5, H * 0.75);
-    vignette.addColorStop(0, bg + '00');
-    vignette.addColorStop(1, bg + '77');
-    ctx.fillStyle = vignette;
-    ctx.fillRect(0, 0, W, H);
-
     if (impact > 0) {
-      ctx.fillStyle = accent + '11';
+      ctx.fillStyle = accent + Math.round(impact * 40).toString(16).padStart(2, '0');
       ctx.fillRect(0, 0, W, H);
     }
   }, [locationName]);

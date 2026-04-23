@@ -9,23 +9,17 @@ import { RightPanel } from './components/panels/RightPanel';
 import { DynamicSlot } from './components/DynamicSlot';
 import './styles/themes.css';
 
-// Inner component so useGameStream can share context with NarrativePanel
 function GameShell() {
   const theme = useGameStore((s) => s.theme);
-  const { sendAction } = useGameStream();
+  const { sendAction, startNewCampaign } = useGameStream();
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
-  // ← REMOVE the mountComponent('map-scene', 'DungeonScene') useEffect entirely
-  // The opening scene will mount it via the mount_component SSE instruction
-
   return (
     <div style={ROOT_STYLE}>
-      <TopBar onNewCampaign={function (): void {
-        throw new Error('Function not implemented.');
-      }} />
+      <TopBar onNewCampaign={() => startNewCampaign('player_one')} />
       <div style={MAIN_STYLE}>
         <LeftPanel />
         <div style={CENTER_STYLE}>
