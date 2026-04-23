@@ -3,7 +3,7 @@
   border-right: 0.5px solid var(--color-border);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: visible;  /* ← change */
   position: relative;
 }
 
@@ -49,10 +49,10 @@
   opacity: 0.3;
 }
 
-/* ── Party list ───────────────────────────────── */
 .partyList {
   flex: 1;
   overflow-y: auto;
+  overflow-x: visible;  /* ← add this */
   padding: 12px;
   display: flex;
   flex-direction: column;
@@ -69,7 +69,7 @@
   border-radius: 4px;
   padding: 12px;
   position: relative;
-  overflow: hidden;
+  overflow: visible;  /* ← change from hidden to visible */
   transition: border-color 0.2s;
   cursor: default;
 }
