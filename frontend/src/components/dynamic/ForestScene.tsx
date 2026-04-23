@@ -7,103 +7,206 @@ function getCSSVar(name: string, fallback = '#888888'): string {
 
 export default function ForestScene() {
   const locationName = useGameStore((s) => s.world.locationName);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const rafRef = useRef<number>(0);
+  const combatLog    = useGameStore((s) => s.combatLog);
+  const canvasRef    = useRef<HTMLCanvasElement>(null);
+  const rafRef       = useRef<number>(0);
+  const animState    = useRef<'idle'|'attack'|'recoil'>('idle');
+  const prevLen      = useRef(0);
+  const impactRef    = useRef(0);
+
+  useEffect(() => {
+    if (combatLog.length > prevLen.current) {
+      prevLen.current = combatLog.length;
+      animState.current = 'attack';
+      impactRef.current = 1.0;
+      setTimeout(() => { animState.current = 'recoil'; }, 350);
+      setTimeout(() => { animState.current = 'idle'; impactRef.current = 0; }, 800);
+    }
+  }, [combatLog.length]);
 
   const draw = useCallback((ctx: CanvasRenderingContext2D, t: number) => {
     const W = ctx.canvas.width, H = ctx.canvas.height;
     if (!W || !H) return;
+    const bg     = getCSSVar('--color-bg-base',        '#08070a');
+    const accent = getCSSVar('--color-accent-primary', '#c9a227');
+    const torch  = getCSSVar('--torch-color',          '#f5a623');
+    const wall   = getCSSVar('--map-wall-color',       '#0e0b07');
+    const floorC = getCSSVar('--map-floor-color',      '#111009');
+    const state  = animState.current;
+    if (impactRef.current > 0) impactRef.current = Math.max(0, impactRef.current - 0.022);
+    const impact = impactRef.current;
+    // DRAW BODY HERE
+    const vpX = W * 0.5;
+    const vpY = H * 0.45;
 
-    const bg     = getCSSVar('--color-bg-base',        '#08100a');
-    const accent = getCSSVar('--color-accent-primary', '#7fbf5e');
-    const torch  = getCSSVar('--torch-color',          '#80e860');
-    const floor  = getCSSVar('--map-floor-color',      '#0a1a0c');
+    const ceilingGrad = ctx.createLinearGradient(0, 0, 0, vpY);
+    ceilingGrad.addColorStop(0, bg);
+    ceilingGrad.addColorStop(1, wall);
+    ctx.fillStyle = ceilingGrad;
+    ctx.fillRect(0, 0, W, vpY);
 
-    // Sky gradient
-    const sky = ctx.createLinearGradient(0, 0, 0, H * 0.6);
-    sky.addColorStop(0, bg);
-    sky.addColorStop(1, floor);
-    ctx.fillStyle = sky;
-    ctx.fillRect(0, 0, W, H);
+    const floorGrad = ctx.createLinearGradient(0, vpY, 0, H);
+    floorGrad.addColorStop(0, wall);
+    floorGrad.addColorStop(1, floorC);
+    ctx.fillStyle = floorGrad;
+    ctx.fillRect(0, vpY, W, H - vpY);
 
-    // Ground
-    ctx.fillStyle = floor;
-    ctx.fillRect(0, H * 0.68, W, H * 0.32);
+    ctx.fillStyle = wall;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(W * 0.28, 0);
+    ctx.lineTo(vpX - W * 0.08, vpY);
+    ctx.lineTo(vpX - W * 0.16, H);
+    ctx.lineTo(0, H);
+    ctx.closePath();
+    ctx.fill();
 
-    // Trees — first person, receding into darkness
-    const treePositions = [
-      { x: W * 0.05, h: H * 0.85, w: 18 },
-      { x: W * 0.18, h: H * 0.75, w: 14 },
-      { x: W * 0.78, h: H * 0.75, w: 14 },
-      { x: W * 0.92, h: H * 0.85, w: 18 },
-      { x: W * 0.32, h: H * 0.65, w: 10 },
-      { x: W * 0.65, h: H * 0.65, w: 10 },
-    ];
+    ctx.beginPath();
+    ctx.moveTo(W, 0);
+    ctx.lineTo(W * 0.72, 0);
+    ctx.lineTo(vpX + W * 0.08, vpY);
+    ctx.lineTo(vpX + W * 0.16, H);
+    ctx.lineTo(W, H);
+    ctx.closePath();
+    ctx.fill();
 
-    treePositions.forEach(({ x, h, w }) => {
-      // Trunk
-      ctx.fillStyle = '#2a1a08';
-      ctx.fillRect(x - w / 2, H - h, w, h);
-      // Canopy layers
-      ctx.fillStyle = accent + '44';
-      ctx.beginPath();
-      ctx.ellipse(x, H - h, w * 3, h * 0.4, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = accent + '33';
-      ctx.beginPath();
-      ctx.ellipse(x, H - h * 0.7, w * 2.5, h * 0.35, 0, 0, Math.PI * 2);
-      ctx.fill();
-    });
-
-    // Fireflies
-    for (let i = 0; i < 12; i++) {
-      const fx = W * 0.15 + Math.sin(t * 0.4 + i * 2.1) * W * 0.35;
-      const fy = H * 0.3 + Math.cos(t * 0.3 + i * 1.7) * H * 0.25;
-      const alpha = 0.4 + 0.6 * Math.sin(t * 3 + i * 1.3);
-      const g = ctx.createRadialGradient(fx, fy, 0, fx, fy, 8);
-      g.addColorStop(0, torch + Math.round(alpha * 255).toString(16).padStart(2, '0'));
-      g.addColorStop(1, 'transparent');
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.arc(fx, fy, 8, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // Ground mist
-    for (let i = 0; i < 5; i++) {
-      const mx = W * 0.1 + Math.sin(t * 0.2 + i * 1.4) * W * 0.4;
-      const my = H * 0.72 + Math.cos(t * 0.15 + i) * H * 0.04;
-      const g2 = ctx.createRadialGradient(mx, my, 0, mx, my, 80);
-      g2.addColorStop(0, accent + '18');
-      g2.addColorStop(1, 'transparent');
-      ctx.fillStyle = g2;
-      ctx.fillRect(mx - 80, my - 30, 160, 60);
-    }
-
-    // Path perspective lines
     ctx.strokeStyle = accent + '22';
-    ctx.lineWidth = 1;
-    const vx = W * 0.5, vy = H * 0.55;
-    for (let i = 0; i <= 6; i++) {
-      const bx = W * 0.25 + (i / 6) * W * 0.5;
+    ctx.lineWidth = 2;
+    for (let i = -6; i <= 6; i++) {
+      const x = vpX + i * (W * 0.08);
       ctx.beginPath();
-      ctx.moveTo(bx, H);
-      ctx.lineTo(vx, vy);
+      ctx.moveTo(x, H);
+      ctx.lineTo(vpX, vpY);
       ctx.stroke();
     }
 
-    // Vignette
-    const vign = ctx.createRadialGradient(W/2, H/2, H*0.1, W/2, H/2, H*0.9);
-    vign.addColorStop(0, 'transparent');
-    vign.addColorStop(1, bg + 'f0');
-    ctx.fillStyle = vign;
+    for (let i = 1; i <= 8; i++) {
+      const y = vpY + ((H - vpY) * i) / 9;
+      const inset = (W * 0.42 * i) / 9;
+      ctx.strokeStyle = accent + '18';
+      ctx.beginPath();
+      ctx.moveTo(inset, y);
+      ctx.lineTo(W - inset, y);
+      ctx.stroke();
+    }
+
+    const torchFlickerL = 0.85 + Math.sin(t * 8.7) * 0.08 + Math.sin(t * 17.3) * 0.04;
+    const torchFlickerR = 0.85 + Math.sin(t * 9.1 + 1.2) * 0.08 + Math.sin(t * 15.8 + 0.7) * 0.05;
+    const sconceY = H * 0.3;
+    const leftTorchX = W * 0.18;
+    const rightTorchX = W * 0.82;
+
+    const glowL = ctx.createRadialGradient(leftTorchX, sconceY, 0, leftTorchX, sconceY, W * 0.16);
+    glowL.addColorStop(0, torch + '88');
+    glowL.addColorStop(0.35, torch + '33');
+    glowL.addColorStop(1, torch + '00');
+    ctx.globalAlpha = torchFlickerL;
+    ctx.fillStyle = glowL;
+    ctx.beginPath();
+    ctx.arc(leftTorchX, sconceY, W * 0.16, 0, Math.PI * 2);
+    ctx.fill();
+
+    const glowR = ctx.createRadialGradient(rightTorchX, sconceY, 0, rightTorchX, sconceY, W * 0.16);
+    glowR.addColorStop(0, torch + '88');
+    glowR.addColorStop(0.35, torch + '33');
+    glowR.addColorStop(1, torch + '00');
+    ctx.globalAlpha = torchFlickerR;
+    ctx.fillStyle = glowR;
+    ctx.beginPath();
+    ctx.arc(rightTorchX, sconceY, W * 0.16, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    const drawTorch = (x: number, y: number, flicker: number) => {
+      ctx.fillStyle = accent;
+      ctx.fillRect(x - 10, y + 10, 20, 6);
+      ctx.fillStyle = wall;
+      ctx.fillRect(x - 4, y - 2, 8, 18);
+
+      ctx.fillStyle = torch;
+      ctx.beginPath();
+      ctx.moveTo(x, y - 18);
+      ctx.quadraticCurveTo(x + 10 * flicker, y - 2, x, y + 6);
+      ctx.quadraticCurveTo(x - 10 * flicker, y - 2, x, y - 18);
+      ctx.fill();
+
+      ctx.fillStyle = accent + 'cc';
+      ctx.beginPath();
+      ctx.moveTo(x, y - 10);
+      ctx.quadraticCurveTo(x + 4, y - 2, x, y + 2);
+      ctx.quadraticCurveTo(x - 4, y - 2, x, y - 10);
+      ctx.fill();
+    };
+
+    drawTorch(leftTorchX, sconceY, torchFlickerL);
+    drawTorch(rightTorchX, sconceY, torchFlickerR);
+
+    ctx.fillStyle = bg + '22';
+    for (let i = 0; i < 24; i++) {
+      const px = ((i * 97.13 + t * 12) % (W + 80)) - 40;
+      const py = vpY + (((i * 53.71 + t * 18) % (H - vpY + 60)) - 30);
+      const r = 1 + (i % 3);
+      ctx.beginPath();
+      ctx.arc(px, py, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    for (let i = 0; i < 5; i++) {
+      const my = vpY + H * 0.08 + i * H * 0.08;
+      const mist = ctx.createLinearGradient(0, my, 0, my + H * 0.08);
+      mist.addColorStop(0, bg + '00');
+      mist.addColorStop(0.5, accent + '10');
+      mist.addColorStop(1, bg + '00');
+      ctx.fillStyle = mist;
+      const drift = Math.sin(t * 0.35 + i * 1.7) * W * 0.04;
+      ctx.fillRect(-W * 0.1 + drift, my, W * 1.2, H * 0.08);
+    }
+
+    ctx.globalAlpha = 0.45;
+    ctx.fillStyle = bg + '66';
+    ctx.beginPath();
+    ctx.moveTo(vpX - W * 0.03, vpY + H * 0.02);
+    ctx.lineTo(vpX + W * 0.03, vpY + H * 0.02);
+    ctx.lineTo(vpX + W * 0.018, vpY + H * 0.12);
+    ctx.lineTo(vpX - W * 0.018, vpY + H * 0.12);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    const handY = H * 0.92 + Math.sin(t * 1.6) * 2;
+    ctx.fillStyle = accent + 'aa';
+    ctx.beginPath();
+    ctx.moveTo(W * 0.46, H);
+    ctx.quadraticCurveTo(W * 0.47, handY - 18, W * 0.49, handY - 8);
+    ctx.lineTo(W * 0.51, handY - 8);
+    ctx.quadraticCurveTo(W * 0.53, handY - 18, W * 0.54, H);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = wall;
+    ctx.beginPath();
+    ctx.moveTo(W * 0.495, handY - 28);
+    ctx.lineTo(W * 0.505, handY - 28);
+    ctx.lineTo(W * 0.515, H);
+    ctx.lineTo(W * 0.485, H);
+    ctx.closePath();
+    ctx.fill();
+
+    const vignette = ctx.createRadialGradient(vpX, H * 0.5, W * 0.2, vpX, H * 0.5, W * 0.75);
+    vignette.addColorStop(0, bg + '00');
+    vignette.addColorStop(1, bg + '77');
+    ctx.fillStyle = vignette;
     ctx.fillRect(0, 0, W, H);
 
-    // Label
-    ctx.fillStyle = accent + 'bb';
-    ctx.font = `11px 'Cinzel', serif`;
-    ctx.textAlign = 'center';
-    ctx.fillText(`◆  ${locationName.toUpperCase()}  ◆`, W / 2, 22);
+    if (state === 'attack') {
+      ctx.fillStyle = '#ff000022';
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    if (state === 'recoil' && impact > 0) {
+      ctx.fillStyle = accent + '22';
+      ctx.fillRect(0, 0, W, H);
+    }
   }, [locationName]);
 
   useEffect(() => {
@@ -112,7 +215,7 @@ export default function ForestScene() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     const resize = () => {
-      canvas.width = canvas.parentElement?.clientWidth || 800;
+      canvas.width  = canvas.parentElement?.clientWidth  || 800;
       canvas.height = canvas.parentElement?.clientHeight || 500;
     };
     const ro = new ResizeObserver(resize);

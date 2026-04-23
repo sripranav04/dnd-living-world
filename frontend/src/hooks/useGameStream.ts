@@ -3,7 +3,8 @@ import { useGameStore } from '../store/gameStore';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
-// ── SSE event types ───────────────────────────────────────
+// Module-level flag — resets on true page load, survives HMR
+let _sessionStarted = false;
 
 interface NarrativeEvent {
   type: 'narrative_text';
@@ -20,64 +21,49 @@ interface CombatLogEvent {
   text: string;
   log_type: 'attack' | 'spell' | 'heal' | 'move' | 'system';
 }
-interface SessionTypeEvent {
-  type: 'session_type';
-  is_new: boolean;
-}
-interface TurnChangeEvent {
-  type: 'turn_change';
-  active_character: string;
-}
+interface SessionTypeEvent { type: 'session_type'; is_new: boolean; }
+interface TurnChangeEvent  { type: 'turn_change';  active_character: string; }
 interface StreamControlEvent { type: 'stream_start' | 'stream_end'; }
 interface ErrorEvent { type: 'error'; message: string; }
 
 type GameSSEEvent =
-  | NarrativeEvent
-  | UIInstructionEvent
-  | CombatLogEvent
-  | SessionTypeEvent
-  | TurnChangeEvent
-  | StreamControlEvent
-  | ErrorEvent;
-
-// ── Hook ─────────────────────────────────────────────────
+  | NarrativeEvent | UIInstructionEvent | CombatLogEvent
+  | SessionTypeEvent | TurnChangeEvent | StreamControlEvent | ErrorEvent;
 
 export function useGameStream() {
-  const esRef          = useRef<EventSource | null>(null);
-  const sessionStarted = useRef(false);
+  const esRef = useRef<EventSource | null>(null);
 
-  const {
-    appendNarrative,
-    appendLog,
-    applyUIInstruction,
-    setDmTyping,
-    setActiveCharacter,
-  } = useGameStore();
+  const storeRef = useRef(useGameStore.getState());
+  useEffect(() => {
+    return useGameStore.subscribe((state) => {
+      storeRef.current = state;
+    });
+  }, []);
 
   const handleEvent = useCallback((raw: string) => {
     let event: GameSSEEvent;
-    try {
-      event = JSON.parse(raw) as GameSSEEvent;
-    } catch {
-      return;
-    }
+    try { event = JSON.parse(raw) as GameSSEEvent; }
+    catch { return; }
+
+    const store = storeRef.current;
 
     switch (event.type) {
       case 'stream_start':
-        setDmTyping(true);
+        store.setDmTyping(true);
         break;
 
       case 'stream_end':
-        setDmTyping(false);
+        store.setDmTyping(false);
+        if (esRef.current) { esRef.current.close(); esRef.current = null; }
         break;
 
       case 'session_type':
-        console.log(`[session] ${event.is_new ? '🆕 New campaign' : '🔄 Returning session'}`);
+        console.log(`[session] ${event.is_new ? '🆕 New' : '🔄 Returning'}`);
         break;
 
       case 'narrative_text':
-        setDmTyping(false);
-        appendNarrative({
+        store.setDmTyping(false);
+        store.appendNarrative({
           speaker: event.speaker,
           speakerLabel: event.speaker_label ?? (event.speaker === 'dm' ? 'Dungeon Master' : 'Player'),
           text: event.text,
@@ -86,48 +72,54 @@ export function useGameStream() {
 
       case 'ui_instruction':
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        applyUIInstruction(event.instruction as any);
+        store.applyUIInstruction(event.instruction as any);
         break;
 
       case 'combat_log':
-        appendLog(event.text, event.log_type);
+        store.appendLog(event.text, event.log_type);
         break;
 
       case 'turn_change':
-        // Advances active highlight across party card, initiative row, and map token
-        setActiveCharacter(event.active_character);
+        store.setActiveCharacter(event.active_character);
         console.log(`[turn] now acting: ${event.active_character}`);
         break;
 
       case 'error':
-        console.error('[useGameStream] server error:', event.message);
-        setDmTyping(false);
+        console.error('[stream] error:', event.message);
+        store.setDmTyping(false);
         break;
     }
-  }, [appendNarrative, appendLog, applyUIInstruction, setDmTyping, setActiveCharacter]);
+  }, []);
 
   const close = useCallback(() => {
-    if (esRef.current) {
-      esRef.current.close();
-      esRef.current = null;
-    }
-    setDmTyping(false);
-  }, [setDmTyping]);
+    if (esRef.current) { esRef.current.close(); esRef.current = null; }
+    storeRef.current.setDmTyping(false);
+  }, []);
 
-  // ── Auto-start: fetch opening scene on mount ──────────
+  // ── Session start ─────────────────────────────────────
   useEffect(() => {
-    if (sessionStarted.current) return;
-    sessionStarted.current = true;
+    if (_sessionStarted) {
+      console.log('[useGameStream] already started, skipping');
+      return;
+    }
+    _sessionStarted = true;
 
     const sessionId = new URLSearchParams(window.location.search).get('session') ?? 'player_one';
     const url = new URL(`${API_BASE}/game/session/start`);
     url.searchParams.set('session_id', sessionId);
 
+    console.log('[useGameStream] connecting:', sessionId);
+
     const es = new EventSource(url.toString());
     esRef.current = es;
     es.onmessage = (e) => handleEvent(e.data);
-    es.onerror   = () => { es.close(); esRef.current = null; setDmTyping(false); };
-  }, [handleEvent, setDmTyping]);
+    es.onerror = () => {
+      if (es.readyState === EventSource.CLOSED) {
+        esRef.current = null;
+        storeRef.current.setDmTyping(false);
+      }
+    };
+  }, [handleEvent]);
 
   // ── Player action ─────────────────────────────────────
   const sendAction = useCallback((
@@ -136,13 +128,12 @@ export function useGameStream() {
     activeCharacter = '',
   ) => {
     close();
-
-    appendNarrative({
+    storeRef.current.appendNarrative({
       speaker: 'player',
       speakerLabel: 'Player',
       text: playerAction,
     });
-    setDmTyping(true);
+    storeRef.current.setDmTyping(true);
 
     const url = new URL(`${API_BASE}/game/action`);
     url.searchParams.set('action', playerAction);
@@ -152,12 +143,17 @@ export function useGameStream() {
     const es = new EventSource(url.toString());
     esRef.current = es;
     es.onmessage = (e) => handleEvent(e.data);
-    es.onerror   = () => { setDmTyping(false); es.close(); esRef.current = null; };
-  }, [close, appendNarrative, setDmTyping, handleEvent]);
+    es.onerror = () => {
+      storeRef.current.setDmTyping(false);
+      es.close();
+      esRef.current = null;
+    };
+  }, [close, handleEvent]);
 
   // ── New campaign ──────────────────────────────────────
   const startNewCampaign = useCallback(async (sessionId = 'player_one') => {
     close();
+    _sessionStarted = false; // reset so next load triggers fresh session
     await fetch(`${API_BASE}/game/session/${sessionId}`, { method: 'DELETE' });
     window.location.reload();
   }, [close]);

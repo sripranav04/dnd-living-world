@@ -7,125 +7,221 @@ function getCSSVar(name: string, fallback = '#888888'): string {
 
 export default function TavernScene() {
   const locationName = useGameStore((s) => s.world.locationName);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const rafRef = useRef<number>(0);
+  const combatLog    = useGameStore((s) => s.combatLog);
+  const canvasRef    = useRef<HTMLCanvasElement>(null);
+  const rafRef       = useRef<number>(0);
+  const animState    = useRef<'idle'|'attack'|'recoil'>('idle');
+  const prevLen      = useRef(0);
+  const impactRef    = useRef(0);
+
+  useEffect(() => {
+    if (combatLog.length > prevLen.current) {
+      prevLen.current = combatLog.length;
+      animState.current = 'attack';
+      impactRef.current = 1.0;
+      setTimeout(() => { animState.current = 'recoil'; }, 350);
+      setTimeout(() => { animState.current = 'idle'; impactRef.current = 0; }, 800);
+    }
+  }, [combatLog.length]);
 
   const draw = useCallback((ctx: CanvasRenderingContext2D, t: number) => {
     const W = ctx.canvas.width, H = ctx.canvas.height;
     if (!W || !H) return;
+    const bg     = getCSSVar('--color-bg-base',        '#08070a');
+    const accent = getCSSVar('--color-accent-primary', '#c9a227');
+    const torch  = getCSSVar('--torch-color',          '#f5a623');
+    const wall   = getCSSVar('--map-wall-color',       '#0e0b07');
+    const floorC = getCSSVar('--map-floor-color',      '#111009');
+    const state  = animState.current;
+    if (impactRef.current > 0) impactRef.current = Math.max(0, impactRef.current - 0.022);
+    const impact = impactRef.current;
+    // DRAW BODY HERE
 
-    const bg     = getCSSVar('--color-bg-base',        '#100a04');
-    const accent = getCSSVar('--color-accent-primary', '#e8a020');
-    const torch  = getCSSVar('--torch-color',          '#ff8820');
-    const wall   = getCSSVar('--map-wall-color',       '#0c0802');
-    const floor  = getCSSVar('--map-floor-color',      '#1a1008');
+    const vpX = W * 0.5;
+    const vpY = H * 0.45;
 
-    // Background warm wall
-    ctx.fillStyle = wall;
+    const wallShade = ctx.createLinearGradient(0, 0, W, 0);
+    wallShade.addColorStop(0, wall);
+    wallShade.addColorStop(0.18, bg);
+    wallShade.addColorStop(0.5, bg);
+    wallShade.addColorStop(0.82, bg);
+    wallShade.addColorStop(1, wall);
+    ctx.fillStyle = wallShade;
     ctx.fillRect(0, 0, W, H);
 
-    // Warm firelight gradient on wall
-    const fireGlow = ctx.createRadialGradient(W * 0.5, H * 0.8, 0, W * 0.5, H * 0.8, W * 0.7);
-    fireGlow.addColorStop(0, torch + '33');
-    fireGlow.addColorStop(1, 'transparent');
-    ctx.fillStyle = fireGlow;
-    ctx.fillRect(0, 0, W, H);
+    const ceilingGrad = ctx.createLinearGradient(0, 0, 0, vpY);
+    ceilingGrad.addColorStop(0, wall);
+    ceilingGrad.addColorStop(1, bg + '00');
+    ctx.fillStyle = ceilingGrad;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(W, 0);
+    ctx.lineTo(W * 0.72, vpY);
+    ctx.lineTo(W * 0.28, vpY);
+    ctx.closePath();
+    ctx.fill();
 
-    // Floor — wooden planks
-    ctx.fillStyle = floor;
-    ctx.fillRect(0, H * 0.7, W, H * 0.3);
+    const floorGrad = ctx.createLinearGradient(0, vpY, 0, H);
+    floorGrad.addColorStop(0, floorC + '66');
+    floorGrad.addColorStop(0.35, floorC + 'bb');
+    floorGrad.addColorStop(1, floorC);
+    ctx.fillStyle = floorGrad;
+    ctx.beginPath();
+    ctx.moveTo(W * 0.28, vpY);
+    ctx.lineTo(W * 0.72, vpY);
+    ctx.lineTo(W, H);
+    ctx.lineTo(0, H);
+    ctx.closePath();
+    ctx.fill();
 
-    // Wooden plank lines
-    ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+    ctx.strokeStyle = accent + '22';
     ctx.lineWidth = 1;
-    for (let i = 0; i < 6; i++) {
-      const y = H * 0.7 + (i / 6) * H * 0.3;
+    for (let i = -8; i <= 8; i++) {
+      const x = vpX + i * (W * 0.06);
       ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(W, y);
+      ctx.moveTo(x, H);
+      ctx.lineTo(vpX, vpY);
       ctx.stroke();
     }
-    // Plank perspective lines
-    const vx = W * 0.5, vy = H * 0.7;
-    for (let i = 0; i <= 8; i++) {
+    for (let i = 1; i <= 8; i++) {
+      const y = vpY + i * ((H - vpY) / 9);
+      const inset = (y - vpY) * 0.9;
       ctx.beginPath();
-      ctx.moveTo((i / 8) * W, H);
-      ctx.lineTo(vx, vy);
+      ctx.moveTo(inset, y);
+      ctx.lineTo(W - inset, y);
       ctx.stroke();
     }
 
-    // Bar counter in background
-    ctx.fillStyle = '#2a1a08';
-    ctx.fillRect(W * 0.15, H * 0.45, W * 0.7, H * 0.25);
-    ctx.fillStyle = '#3a2510';
-    ctx.fillRect(W * 0.12, H * 0.42, W * 0.76, H * 0.06);
-
-    // Ale mugs on counter
-    [W * 0.3, W * 0.5, W * 0.65].forEach((x) => {
-      ctx.fillStyle = '#6b4010';
-      ctx.fillRect(x - 8, H * 0.34, 16, 20);
-      ctx.fillStyle = '#d4a030' + '88';
-      ctx.fillRect(x - 7, H * 0.34, 14, 6);
-    });
-
-    // Fireplace — center background
-    const fpx = W * 0.5, fpy = H * 0.55;
-    ctx.fillStyle = '#1a0a04';
-    ctx.fillRect(fpx - 40, fpy - 50, 80, 55);
-
-    // Fire in fireplace
-    for (let i = 0; i < 8; i++) {
-      const fx = fpx + Math.sin(t * 3 + i * 0.8) * 15;
-      const fy = fpy - 10 - i * 5;
-      const fr = (8 - i) * 4;
-      const flicker = 1 + 0.3 * Math.sin(t * 7 + i);
-      const g = ctx.createRadialGradient(fx, fy, 0, fx, fy, fr * flicker);
-      g.addColorStop(0, i < 3 ? '#ffffff88' : torch + 'cc');
-      g.addColorStop(1, 'transparent');
-      ctx.fillStyle = g;
+    ctx.strokeStyle = wall + 'cc';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 7; i++) {
+      const p = i / 6;
+      const lx = W * (0.12 + p * 0.18);
+      const rx = W * (0.88 - p * 0.18);
+      const y1 = H * (0.08 + p * 0.08);
+      const y2 = H * (0.92 - p * 0.08);
       ctx.beginPath();
-      ctx.arc(fx, fy, fr * flicker, 0, Math.PI * 2);
+      ctx.moveTo(lx, y1);
+      ctx.lineTo(lx + W * 0.03, y2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(rx, y1);
+      ctx.lineTo(rx - W * 0.03, y2);
+      ctx.stroke();
+    }
+
+    const torchY = H * 0.3;
+    const flickerL = 0.85 + Math.sin(t * 8.7) * 0.08 + Math.sin(t * 17.3) * 0.04;
+    const flickerR = 0.85 + Math.sin(t * 9.4 + 1.2) * 0.08 + Math.sin(t * 15.1) * 0.05;
+
+    const drawTorch = (x: number, y: number, flicker: number, side: 'left' | 'right') => {
+      const glow = ctx.createRadialGradient(x, y, 4, x, y, H * 0.16);
+      glow.addColorStop(0, torch + 'aa');
+      glow.addColorStop(0.35, torch + '44');
+      glow.addColorStop(1, torch + '00');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(x, y, H * 0.16, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      if (side === 'left') {
+        ctx.moveTo(x - W * 0.03, y + H * 0.015);
+        ctx.lineTo(x + W * 0.005, y + H * 0.005);
+      } else {
+        ctx.moveTo(x + W * 0.03, y + H * 0.015);
+        ctx.lineTo(x - W * 0.005, y + H * 0.005);
+      }
+      ctx.stroke();
+
+      ctx.fillStyle = accent;
+      ctx.beginPath();
+      ctx.arc(x, y + H * 0.008, H * 0.012, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = torch + 'dd';
+      ctx.beginPath();
+      ctx.moveTo(x, y - H * 0.035 * flicker);
+      ctx.quadraticCurveTo(x + W * 0.012, y - H * 0.005, x, y + H * 0.01);
+      ctx.quadraticCurveTo(x - W * 0.012, y - H * 0.005, x, y - H * 0.035 * flicker);
+      ctx.fill();
+
+      ctx.fillStyle = accent + 'dd';
+      ctx.beginPath();
+      ctx.moveTo(x, y - H * 0.02 * flicker);
+      ctx.quadraticCurveTo(x + W * 0.006, y - H * 0.002, x, y + H * 0.006);
+      ctx.quadraticCurveTo(x - W * 0.006, y - H * 0.002, x, y - H * 0.02 * flicker);
+      ctx.fill();
+    };
+
+    drawTorch(W * 0.18, torchY, flickerL, 'left');
+    drawTorch(W * 0.82, torchY, flickerR, 'right');
+
+    const mist = ctx.createLinearGradient(0, vpY - H * 0.05, 0, H);
+    mist.addColorStop(0, bg + '00');
+    mist.addColorStop(0.45, accent + '08');
+    mist.addColorStop(1, bg + '22');
+    ctx.fillStyle = mist;
+    ctx.fillRect(0, vpY - H * 0.05, W, H - vpY + H * 0.05);
+
+    for (let i = 0; i < 28; i++) {
+      const px = ((i * 97.13 + t * 12) % (W + 40)) - 20;
+      const py = vpY + ((i * 43.71 + t * 7) % (H - vpY));
+      const r = 0.8 + (i % 3) * 0.7;
+      ctx.fillStyle = accent + (i % 2 === 0 ? '22' : '14');
+      ctx.beginPath();
+      ctx.arc(px, py, r, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    // Wall torches
-    [[W * 0.15, H * 0.3], [W * 0.85, H * 0.3]].forEach(([x, y], i) => {
-      const flicker = 1 + 0.2 * Math.sin(t * 9 + i * 2.5);
-      const g = ctx.createRadialGradient(x, y, 0, x, y, 70 * flicker);
-      g.addColorStop(0, torch + '66');
-      g.addColorStop(1, 'transparent');
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.arc(x, y, 70 * flicker, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = torch;
-      ctx.beginPath();
-      ctx.ellipse(x, y - 5, 4 * flicker, 7 * flicker, 0, 0, Math.PI * 2);
-      ctx.fill();
-    });
+    ctx.save();
+    ctx.globalAlpha = 0.35;
+    ctx.fillStyle = bg + 'aa';
+    ctx.beginPath();
+    ctx.moveTo(vpX - W * 0.025, vpY + H * 0.02);
+    ctx.quadraticCurveTo(vpX - W * 0.018, vpY - H * 0.03, vpX, vpY - H * 0.035);
+    ctx.quadraticCurveTo(vpX + W * 0.018, vpY - H * 0.03, vpX + W * 0.025, vpY + H * 0.02);
+    ctx.quadraticCurveTo(vpX + W * 0.012, vpY + H * 0.06, vpX, vpY + H * 0.055);
+    ctx.quadraticCurveTo(vpX - W * 0.012, vpY + H * 0.06, vpX - W * 0.025, vpY + H * 0.02);
+    ctx.fill();
+    ctx.restore();
 
-    // Smoke particles rising
-    for (let i = 0; i < 8; i++) {
-      const sx = fpx + Math.sin(t * 0.5 + i * 1.2) * 12;
-      const sy = fpy - 50 - ((t * 20 + i * 15) % 80);
-      const alpha = 0.08 + 0.04 * Math.sin(t + i);
-      ctx.fillStyle = `rgba(180,120,60,${alpha})`;
-      ctx.beginPath();
-      ctx.arc(sx, sy, 8 + i * 1.5, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    const handY = H * 0.92 + Math.sin(t * 1.6) * 2;
+    ctx.fillStyle = wall;
+    ctx.beginPath();
+    ctx.moveTo(W * 0.44, H);
+    ctx.quadraticCurveTo(W * 0.455, handY - H * 0.03, W * 0.48, handY - H * 0.02);
+    ctx.lineTo(W * 0.52, handY - H * 0.02);
+    ctx.quadraticCurveTo(W * 0.545, handY - H * 0.03, W * 0.56, H);
+    ctx.closePath();
+    ctx.fill();
 
-    // Vignette
-    const vign = ctx.createRadialGradient(W/2, H/2, H*0.15, W/2, H/2, H*0.85);
-    vign.addColorStop(0, 'transparent');
-    vign.addColorStop(1, bg + 'f0');
-    ctx.fillStyle = vign;
+    ctx.fillStyle = accent + '88';
+    ctx.beginPath();
+    ctx.moveTo(W * 0.495, handY - H * 0.08);
+    ctx.lineTo(W * 0.505, handY - H * 0.08);
+    ctx.lineTo(W * 0.515, handY - H * 0.02);
+    ctx.lineTo(W * 0.485, handY - H * 0.02);
+    ctx.closePath();
+    ctx.fill();
+
+    const vignette = ctx.createRadialGradient(vpX, H * 0.5, H * 0.2, vpX, H * 0.5, H * 0.8);
+    vignette.addColorStop(0, bg + '00');
+    vignette.addColorStop(1, bg + '77');
+    ctx.fillStyle = vignette;
     ctx.fillRect(0, 0, W, H);
 
-    ctx.fillStyle = accent + 'bb';
-    ctx.font = `11px 'Cinzel', serif`;
-    ctx.textAlign = 'center';
-    ctx.fillText(`◆  ${locationName.toUpperCase()}  ◆`, W / 2, 22);
+    if (state === 'attack') {
+      ctx.fillStyle = '#ff000022';
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    if (impact > 0) {
+      ctx.fillStyle = accent + '11';
+      ctx.fillRect(0, 0, W, H);
+    }
   }, [locationName]);
 
   useEffect(() => {
@@ -134,7 +230,7 @@ export default function TavernScene() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     const resize = () => {
-      canvas.width = canvas.parentElement?.clientWidth || 800;
+      canvas.width  = canvas.parentElement?.clientWidth  || 800;
       canvas.height = canvas.parentElement?.clientHeight || 500;
     };
     const ro = new ResizeObserver(resize);

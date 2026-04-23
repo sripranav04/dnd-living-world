@@ -4,17 +4,16 @@ from langchain_core.language_models import BaseChatModel
 _instances: dict[str, BaseChatModel] = {}
 
 
-def get_llm() -> BaseChatModel:
+def get_llm(purpose: str = "general") -> BaseChatModel:
     """
-    Returns a LangChain chat model.
-    Provider controlled by LLM_PROVIDER env var (aws | azure).
-    Model tier controlled by APP_ENV env var (dev | prod).
+    purpose: "general" = GPT-5.4 standard settings
+             "code"    = GPT-5.4 with higher token limit + lower temperature for code generation
     """
     global _instances
 
     provider  = os.environ.get("LLM_PROVIDER", "aws").lower()
     app_env   = os.environ.get("APP_ENV", "dev").lower()
-    cache_key = f"{provider}:{app_env}"
+    cache_key = f"{provider}:{app_env}:{purpose}"
 
     if cache_key in _instances:
         return _instances[cache_key]
@@ -22,23 +21,26 @@ def get_llm() -> BaseChatModel:
     if provider == "azure":
         from langchain_openai import AzureChatOpenAI
 
-        deployment = (
-            os.environ.get("AZURE_DEPLOYMENT_DEV", "gpt-5.4")
-            if app_env == "dev"
-            else os.environ.get("AZURE_DEPLOYMENT_PROD", "gpt-5.4")
-        )
+        deployment = os.environ.get("AZURE_DEPLOYMENT_DEV", "gpt-5.4")
+
+        if purpose == "code":
+            max_completion_tokens = int(os.environ.get("LLM_MAX_TOKENS_CODE", "8192"))
+            temperature = 0.2
+        else:
+            max_completion_tokens = int(os.environ.get("LLM_MAX_TOKENS", "2048"))
+            temperature = float(os.environ.get("LLM_TEMPERATURE", "0.8"))
 
         llm = AzureChatOpenAI(
             azure_deployment=deployment,
             azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT"],
             api_key=os.environ["AZURE_OPENAI_API_KEY"],
-            api_version=os.environ.get("AZURE_OPENAI_API_VERSION", "2024-12-01-preview"),
-            temperature=float(os.environ.get("LLM_TEMPERATURE", "0.8")),
-            max_completion_tokens=int(os.environ.get("LLM_max_completion_tokens", "2048")),
+            api_version=os.environ.get("AZURE_OPENAI_API_VERSION", "2025-04-01-preview"),
+            temperature=temperature,
+             model_kwargs={"max_completion_tokens": max_completion_tokens},
         )
-        print(f"[llm_provider] Azure OpenAI · deployment={deployment} · env={app_env}")
+        print(f"[llm_provider] Azure OpenAI · deployment={deployment} · purpose={purpose} · max_tokens={max_completion_tokens}")
 
-    else:  # aws (default)
+    else:
         from langchain_aws import ChatBedrockConverse
 
         model_id = (
@@ -51,15 +53,14 @@ def get_llm() -> BaseChatModel:
             model=model_id,
             region_name=os.environ.get("AWS_REGION", "us-east-1"),
             temperature=float(os.environ.get("LLM_TEMPERATURE", "0.8")),
-            max_completion_tokens=int(os.environ.get("LLM_max_completion_tokens", "2048")),
+            max_tokens=int(os.environ.get("LLM_MAX_TOKENS", "2048")),
         )
-        print(f"[llm_provider] AWS Bedrock · model={model_id} · env={app_env}")
+        print(f"[llm_provider] AWS Bedrock · model={model_id} · purpose={purpose}")
 
     _instances[cache_key] = llm
     return llm
 
 
 def reset_llm_cache():
-    """Call this if credentials change at runtime."""
     global _instances
     _instances = {}

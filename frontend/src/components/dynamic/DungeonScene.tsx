@@ -1,44 +1,5 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import { useGameStore } from '../../store/gameStore';
-
-function useAnimatedCanvas(draw: (ctx: CanvasRenderingContext2D, t: number) => void) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const rafRef = useRef<number>(0);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const resize = () => {
-      const rect = canvas.getBoundingClientRect();
-      canvas.width = rect.width || canvas.parentElement?.clientWidth || 800;
-      canvas.height = rect.height || canvas.parentElement?.clientHeight || 500;
-    };
-    const ro = new ResizeObserver(resize);
-    ro.observe(canvas);
-    resize();
-    window.addEventListener('resize', resize);
-
-    const start = performance.now();
-    const loop = (now: number) => {
-      const t = (now - start) / 1000;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      draw(ctx, t);
-      rafRef.current = requestAnimationFrame(loop);
-    };
-    rafRef.current = requestAnimationFrame(loop);
-
-    return () => {
-      cancelAnimationFrame(rafRef.current);
-      window.removeEventListener('resize', resize);
-      ro.disconnect();
-    };
-  }, [draw]);
-
-  return canvasRef;
-}
 
 function getCSSVar(name: string, fallback = '#888888'): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
@@ -46,214 +7,257 @@ function getCSSVar(name: string, fallback = '#888888'): string {
 
 export default function DungeonScene() {
   const locationName = useGameStore((s) => s.world.locationName);
+  const combatLog    = useGameStore((s) => s.combatLog);
+  const canvasRef    = useRef<HTMLCanvasElement>(null);
+  const rafRef       = useRef<number>(0);
+  const animState    = useRef<'idle'|'attack'|'recoil'>('idle');
+  const prevLen      = useRef(0);
+  const impactRef    = useRef(0);
 
-  const draw = React.useCallback((ctx: CanvasRenderingContext2D, t: number) => {
-    const W = ctx.canvas.width;
-    const H = ctx.canvas.height;
-    if (W === 0 || H === 0) return;
+  useEffect(() => {
+    if (combatLog.length > prevLen.current) {
+      prevLen.current = combatLog.length;
+      animState.current = 'attack';
+      impactRef.current = 1.0;
+      setTimeout(() => { animState.current = 'recoil'; }, 350);
+      setTimeout(() => { animState.current = 'idle'; impactRef.current = 0; }, 800);
+    }
+  }, [combatLog.length]);
 
-    const bg      = getCSSVar('--color-bg-base',        '#08070a');
-    const wall    = getCSSVar('--map-wall-color',       '#0e0b07');
-    const floor   = getCSSVar('--map-floor-color',      '#111009');
-    const torch   = getCSSVar('--torch-color',          '#f5a623');
-    const accent  = getCSSVar('--color-accent-primary', '#c9a227');
-    const grid    = getCSSVar('--map-grid-color',       'rgba(201,162,39,0.06)');
+  const draw = useCallback((ctx: CanvasRenderingContext2D, t: number) => {
+    const W = ctx.canvas.width, H = ctx.canvas.height;
+    if (!W || !H) return;
+    const bg     = getCSSVar('--color-bg-base',        '#08070a');
+    const accent = getCSSVar('--color-accent-primary', '#c9a227');
+    const torch  = getCSSVar('--torch-color',          '#f5a623');
+    const wall   = getCSSVar('--map-wall-color',       '#0e0b07');
+    const floorC = getCSSVar('--map-floor-color',      '#111009');
+    const state  = animState.current;
+    if (impactRef.current > 0) impactRef.current = Math.max(0, impactRef.current - 0.022);
+    const impact = impactRef.current;
+    // DRAW BODY HERE
+    const vx = W * 0.5;
+    const vy = H * 0.45;
 
-    // ── Sky / ceiling ──────────────────────────────────────
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, W, H);
 
-    // ── First-person corridor walls ────────────────────────
-    // Left wall receding into distance
-    ctx.fillStyle = wall;
+    const ceilGrad = ctx.createLinearGradient(0, 0, 0, vy);
+    ceilGrad.addColorStop(0, wall);
+    ceilGrad.addColorStop(1, bg);
+    ctx.fillStyle = ceilGrad;
     ctx.beginPath();
     ctx.moveTo(0, 0);
-    ctx.lineTo(W * 0.35, H * 0.25);
-    ctx.lineTo(W * 0.35, H * 0.75);
+    ctx.lineTo(W, 0);
+    ctx.lineTo(vx + W * 0.12, vy);
+    ctx.lineTo(vx - W * 0.12, vy);
+    ctx.closePath();
+    ctx.fill();
+
+    const leftWallGrad = ctx.createLinearGradient(0, 0, vx, 0);
+    leftWallGrad.addColorStop(0, wall);
+    leftWallGrad.addColorStop(1, bg);
+    ctx.fillStyle = leftWallGrad;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(vx - W * 0.12, vy);
+    ctx.lineTo(vx - W * 0.18, H);
     ctx.lineTo(0, H);
     ctx.closePath();
     ctx.fill();
 
-    // Right wall receding into distance
+    const rightWallGrad = ctx.createLinearGradient(W, 0, vx, 0);
+    rightWallGrad.addColorStop(0, wall);
+    rightWallGrad.addColorStop(1, bg);
+    ctx.fillStyle = rightWallGrad;
     ctx.beginPath();
     ctx.moveTo(W, 0);
-    ctx.lineTo(W * 0.65, H * 0.25);
-    ctx.lineTo(W * 0.65, H * 0.75);
+    ctx.lineTo(vx + W * 0.12, vy);
+    ctx.lineTo(vx + W * 0.18, H);
     ctx.lineTo(W, H);
     ctx.closePath();
     ctx.fill();
 
-    // Ceiling
+    const floorGrad = ctx.createLinearGradient(0, vy, 0, H);
+    floorGrad.addColorStop(0, bg);
+    floorGrad.addColorStop(1, floorC);
+    ctx.fillStyle = floorGrad;
+    ctx.beginPath();
+    ctx.moveTo(vx - W * 0.12, vy);
+    ctx.lineTo(vx + W * 0.12, vy);
+    ctx.lineTo(W, H);
+    ctx.lineTo(0, H);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = accent + '22';
+    ctx.lineWidth = 1;
+    for (let i = -8; i <= 8; i++) {
+      const x = vx + i * (W * 0.08);
+      ctx.beginPath();
+      ctx.moveTo(x, H);
+      ctx.lineTo(vx, vy);
+      ctx.stroke();
+    }
+
+    for (let i = 0; i < 8; i++) {
+      const y = vy + ((H - vy) * i) / 8;
+      const inset = ((y - vy) / (H - vy)) * W * 0.5;
+      ctx.strokeStyle = accent + '18';
+      ctx.beginPath();
+      ctx.moveTo(inset, y);
+      ctx.lineTo(W - inset, y);
+      ctx.stroke();
+    }
+
+    const torchFlickerL = 0.85 + Math.sin(t * 7.1) * 0.08 + Math.sin(t * 13.7) * 0.05;
+    const torchFlickerR = 0.85 + Math.sin(t * 6.4 + 1.2) * 0.08 + Math.sin(t * 11.9 + 0.7) * 0.05;
+
+    const drawTorch = (x: number, y: number, flicker: number, side: 'left' | 'right') => {
+      const glow = ctx.createRadialGradient(x, y, 0, x, y, H * 0.18);
+      glow.addColorStop(0, torch + '88');
+      glow.addColorStop(0.35, torch + '33');
+      glow.addColorStop(1, torch + '00');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(x, y, H * 0.18, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = Math.max(2, W * 0.004);
+      ctx.beginPath();
+      if (side === 'left') {
+        ctx.moveTo(x + W * 0.03, y - H * 0.02);
+        ctx.lineTo(x, y);
+        ctx.lineTo(x + W * 0.03, y + H * 0.02);
+      } else {
+        ctx.moveTo(x - W * 0.03, y - H * 0.02);
+        ctx.lineTo(x, y);
+        ctx.lineTo(x - W * 0.03, y + H * 0.02);
+      }
+      ctx.stroke();
+
+      ctx.fillStyle = wall;
+      ctx.fillRect(x - W * 0.008, y - H * 0.018, W * 0.016, H * 0.036);
+
+      ctx.fillStyle = torch + 'dd';
+      ctx.beginPath();
+      ctx.ellipse(x, y - H * 0.018, W * 0.008 * flicker, H * 0.022 * flicker, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = accent + 'cc';
+      ctx.beginPath();
+      ctx.ellipse(x, y - H * 0.012, W * 0.004, H * 0.012, 0, 0, Math.PI * 2);
+      ctx.fill();
+    };
+
+    drawTorch(W * 0.16, H * 0.3, torchFlickerL, 'left');
+    drawTorch(W * 0.84, H * 0.3, torchFlickerR, 'right');
+
+    const mist = ctx.createLinearGradient(0, vy, 0, H);
+    mist.addColorStop(0, bg + '00');
+    mist.addColorStop(0.5, accent + '08');
+    mist.addColorStop(1, bg + '22');
+    ctx.fillStyle = mist;
+    ctx.fillRect(0, vy, W, H - vy);
+
+    for (let i = 0; i < 18; i++) {
+      const px = ((i * 73.17 + t * 12) % (W + 40)) - 20;
+      const py = vy + (((i * 41.23 + t * 7) % (H - vy + 60)) - 30);
+      const r = 1 + (i % 3);
+      ctx.fillStyle = accent + '33';
+      ctx.beginPath();
+      ctx.arc(px, py, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    const shadowY = H * 0.5;
+    const shadowGlow = ctx.createRadialGradient(vx, shadowY, 0, vx, shadowY, H * 0.12);
+    shadowGlow.addColorStop(0, bg + '66');
+    shadowGlow.addColorStop(1, bg + '00');
+    ctx.fillStyle = shadowGlow;
+    ctx.beginPath();
+    ctx.ellipse(vx, shadowY, W * 0.08, H * 0.12, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = bg + 'aa';
+    ctx.beginPath();
+    ctx.moveTo(vx, H * 0.38);
+    ctx.lineTo(vx - W * 0.018, H * 0.47);
+    ctx.lineTo(vx - W * 0.01, H * 0.56);
+    ctx.lineTo(vx + W * 0.01, H * 0.56);
+    ctx.lineTo(vx + W * 0.018, H * 0.47);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = wall + '88';
+    ctx.beginPath();
+    ctx.arc(vx, H * 0.41, W * 0.018, Math.PI, 0);
+    ctx.fill();
+
+    const handBob = Math.sin(t * 1.2) * 4;
     ctx.fillStyle = wall;
     ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(W, 0);
-    ctx.lineTo(W * 0.65, H * 0.25);
-    ctx.lineTo(W * 0.35, H * 0.25);
+    ctx.moveTo(W * 0.44, H);
+    ctx.lineTo(W * 0.47, H * 0.88 + handBob);
+    ctx.lineTo(W * 0.53, H * 0.88 + handBob);
+    ctx.lineTo(W * 0.56, H);
     ctx.closePath();
     ctx.fill();
 
-    // Floor
-    ctx.fillStyle = floor;
+    ctx.strokeStyle = accent + '88';
+    ctx.lineWidth = Math.max(2, W * 0.004);
     ctx.beginPath();
-    ctx.moveTo(0, H);
-    ctx.lineTo(W, H);
-    ctx.lineTo(W * 0.65, H * 0.75);
-    ctx.lineTo(W * 0.35, H * 0.75);
+    ctx.moveTo(W * 0.5, H * 0.88 + handBob);
+    ctx.lineTo(W * 0.5, H * 0.76 + handBob);
+    ctx.stroke();
+
+    ctx.fillStyle = accent + '66';
+    ctx.beginPath();
+    ctx.moveTo(W * 0.495, H * 0.76 + handBob);
+    ctx.lineTo(W * 0.505, H * 0.76 + handBob);
+    ctx.lineTo(W * 0.5, H * 0.72 + handBob);
     ctx.closePath();
     ctx.fill();
 
-    // ── Stone block lines on walls ─────────────────────────
-    ctx.strokeStyle = 'rgba(0,0,0,0.4)';
-    ctx.lineWidth = 0.8;
-
-    // Left wall blocks
-    for (let row = 0; row < 5; row++) {
-      const y0 = (row / 5) * H;
-      const y1 = ((row + 1) / 5) * H;
-      const xLeft0 = W * 0.35 * (1 - row / 5);
-      const xLeft1 = W * 0.35 * (1 - (row + 1) / 5);
-      ctx.beginPath();
-      ctx.moveTo(xLeft0, y0);
-      ctx.lineTo(xLeft1, y1);
-      ctx.stroke();
+    if (state === 'attack') {
+      ctx.fillStyle = '#ff000022';
+      ctx.fillRect(0, 0, W, H);
     }
 
-    // Right wall blocks
-    for (let row = 0; row < 5; row++) {
-      const y0 = (row / 5) * H;
-      const y1 = ((row + 1) / 5) * H;
-      const xRight0 = W - W * 0.35 * (1 - row / 5);
-      const xRight1 = W - W * 0.35 * (1 - (row + 1) / 5);
-      ctx.beginPath();
-      ctx.moveTo(xRight0, y0);
-      ctx.lineTo(xRight1, y1);
-      ctx.stroke();
-    }
-
-    // Floor perspective lines
-    ctx.strokeStyle = grid;
-    ctx.lineWidth = 0.5;
-    const floorVanishX = W * 0.5;
-    const floorVanishY = H * 0.75;
-    for (let i = 0; i <= 8; i++) {
-      const startX = (i / 8) * W;
-      ctx.beginPath();
-      ctx.moveTo(startX, H);
-      ctx.lineTo(floorVanishX, floorVanishY);
-      ctx.stroke();
-    }
-    for (let i = 0; i <= 4; i++) {
-      const progress = i / 4;
-      const x0 = W * 0.35 + progress * (W * 0.15);
-      const x1 = W * 0.65 - progress * (W * 0.15);
-      const y = H * 0.75 + progress * (H * 0.25);
-      ctx.beginPath();
-      ctx.moveTo(x0, y);
-      ctx.lineTo(x1, y);
-      ctx.stroke();
-    }
-
-    // ── End of corridor — doorway glow ────────────────────
-    const vanishX = W * 0.5;
-    const vanishY = H * 0.5;
-    const doorW = W * 0.3;
-    const doorH = H * 0.5;
-
-    // Door frame
-    ctx.strokeStyle = accent + '44';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(vanishX - doorW / 2, vanishY - doorH / 2, doorW, doorH);
-
-    // Glow from beyond
-    const doorGlow = ctx.createRadialGradient(vanishX, vanishY, 0, vanishX, vanishY, doorW);
-    doorGlow.addColorStop(0, torch + '22');
-    doorGlow.addColorStop(0.5, torch + '08');
-    doorGlow.addColorStop(1, 'transparent');
-    ctx.fillStyle = doorGlow;
-    ctx.fillRect(vanishX - doorW, vanishY - doorH, doorW * 2, doorH * 2);
-
-    // ── Wall torches ──────────────────────────────────────
-    const torches = [
-      { x: W * 0.33, y: H * 0.35 },
-      { x: W * 0.67, y: H * 0.35 },
-    ];
-
-    torches.forEach((pos, i) => {
-      const flicker = 1 + 0.2 * Math.sin(t * 11 + i * 2.7);
-      const glowR = 90 * flicker;
-
-      // Wall mount bracket
-      ctx.fillStyle = accent + '66';
-      ctx.fillRect(pos.x - 3, pos.y, 6, 12);
-
-      // Glow
-      const g = ctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, glowR);
-      g.addColorStop(0, torch + '55');
-      g.addColorStop(0.4, torch + '18');
-      g.addColorStop(1, 'transparent');
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.arc(pos.x, pos.y, glowR, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Flame
-      ctx.fillStyle = torch;
-      ctx.beginPath();
-      ctx.ellipse(pos.x, pos.y - 6, 5 * flicker, 9 * flicker, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Inner flame
-      ctx.fillStyle = '#ffffff55';
-      ctx.beginPath();
-      ctx.ellipse(pos.x, pos.y - 6, 2, 4 * flicker, 0, 0, Math.PI * 2);
-      ctx.fill();
-    });
-
-    // ── Mist on floor ─────────────────────────────────────
-    for (let i = 0; i < 5; i++) {
-      const px = W * 0.2 + Math.sin(t * 0.25 + i * 1.3) * W * 0.35;
-      const py = H * 0.82 + Math.cos(t * 0.18 + i * 0.9) * H * 0.06;
-      const gr = ctx.createRadialGradient(px, py, 0, px, py, 70);
-      gr.addColorStop(0, accent + '0d');
-      gr.addColorStop(1, 'transparent');
-      ctx.fillStyle = gr;
-      ctx.fillRect(px - 70, py - 30, 140, 60);
-    }
-
-    // ── Dust motes floating ───────────────────────────────
-    for (let i = 0; i < 18; i++) {
-      const px = W * 0.2 + ((i * 149 + t * 8) % (W * 0.6));
-      const py = H * 0.25 + ((i * 83 + t * 3) % (H * 0.5));
-      const alpha = 0.15 + 0.25 * Math.sin(t * 0.8 + i);
-      const alphaHex = Math.round(alpha * 255).toString(16).padStart(2, '0');
-      ctx.fillStyle = accent + alphaHex;
-      ctx.beginPath();
-      ctx.arc(px, py, 0.9, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // ── Vignette ──────────────────────────────────────────
-    const vign = ctx.createRadialGradient(W / 2, H / 2, H * 0.15, W / 2, H / 2, H * 0.85);
-    vign.addColorStop(0, 'transparent');
-    vign.addColorStop(1, bg + 'f2');
-    ctx.fillStyle = vign;
+    const vignette = ctx.createRadialGradient(vx, H * 0.5, H * 0.25, vx, H * 0.5, H * 0.75);
+    vignette.addColorStop(0, bg + '00');
+    vignette.addColorStop(1, bg + '77');
+    ctx.fillStyle = vignette;
     ctx.fillRect(0, 0, W, H);
 
-    // ── Location label ────────────────────────────────────
-    ctx.fillStyle = accent + 'cc';
-    ctx.font = `11px 'Cinzel', serif`;
-    ctx.textAlign = 'center';
-    ctx.fillText(`◆  ${locationName.toUpperCase()}  ◆`, W / 2, 22);
-
+    if (impact > 0) {
+      ctx.fillStyle = accent + '11';
+      ctx.fillRect(0, 0, W, H);
+    }
   }, [locationName]);
 
-  const canvasRef = useAnimatedCanvas(draw);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const resize = () => {
+      canvas.width  = canvas.parentElement?.clientWidth  || 800;
+      canvas.height = canvas.parentElement?.clientHeight || 500;
+    };
+    const ro = new ResizeObserver(resize);
+    ro.observe(canvas);
+    resize();
+    const start = performance.now();
+    const loop = (now: number) => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      draw(ctx, (now - start) / 1000);
+      rafRef.current = requestAnimationFrame(loop);
+    };
+    rafRef.current = requestAnimationFrame(loop);
+    return () => { cancelAnimationFrame(rafRef.current); ro.disconnect(); };
+  }, [draw]);
 
-  return (
-    <canvas
-      ref={canvasRef}
-      style={{ width: '100%', height: '100%', display: 'block' }}
-    />
-  );
+  return <canvas ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block' }} />;
 }
