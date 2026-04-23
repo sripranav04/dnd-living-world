@@ -1,3 +1,4 @@
+import random
 from langgraph.graph import StateGraph, END
 from langchain_core.messages import HumanMessage
 
@@ -9,28 +10,37 @@ from agents.vibe_architect import vibe_architect_node
 
 _session_states: dict = {}
 
-_DEBUG_WORLD = {
-    "inCombat": True,
-    "locationName": "The Vault of Shadows",
-    "biome": "dungeon",
-    "theme": "dark-gothic",
-    "current_encounter": {
-        "enemy_name": "Zombie",
-        "enemy_hp": 45,
-        "enemy_max_hp": 45,
-        "target_ac": 13,
-        "initiative_order": ["vex", "aldric", "lyra", "thane"],
-        "current_turn": "vex",
-        "round_number": 1,
-    },
-}
+MONSTER_ROSTER = [
+    {"name": "Shadow Wraith",   "hp": 45, "ac": 13, "attack_bonus": 4, "damage": "2d6+2"},
+    {"name": "Skeleton Archer", "hp": 13, "ac": 13, "attack_bonus": 4, "damage": "1d6+2"},
+    {"name": "Goblin",          "hp": 7,  "ac": 15, "attack_bonus": 4, "damage": "1d6+2"},
+    {"name": "Zombie",          "hp": 22, "ac": 8,  "attack_bonus": 3, "damage": "1d6+1"},
+]
 
-_DEBUG_PARTY = {
+PARTY_ROSTER= {
     "aldric": {"name": "Aldric", "hp": 54, "max_hp": 54, "ac": 18, "attack_bonus": 7, "damage_expression": "1d8+4"},
     "lyra":   {"name": "Lyra",   "hp": 35, "max_hp": 35, "ac": 13, "attack_bonus": 6, "damage_expression": "1d6+3"},
     "thane":  {"name": "Thane",  "hp": 45, "max_hp": 45, "ac": 16, "attack_bonus": 5, "damage_expression": "1d8+3"},
     "vex":    {"name": "Vex",    "hp": 36, "max_hp": 36, "ac": 15, "attack_bonus": 6, "damage_expression": "1d6+3"},
 }
+
+
+def _fresh_world(monster: dict) -> dict:
+    return {
+        "inCombat": True,
+        "locationName": "The Vault of Shadows",
+        "biome": "dungeon",
+        "theme": "dark-gothic",
+        "current_encounter": {
+            "enemy_name":       monster["name"],
+            "enemy_hp":         monster["hp"],
+            "enemy_max_hp":     monster["hp"],
+            "target_ac":        monster["ac"],
+            "initiative_order": ["vex", "aldric", "lyra", "thane"],
+            "current_turn":     "vex",
+            "round_number":     1,
+        },
+    }
 
 
 async def build_graph():
@@ -53,14 +63,16 @@ async def build_graph():
     return builder.compile()
 
 
-def _fresh_state(session_id: str) -> dict:
+def _fresh_state(session_id: str, monster: dict | None = None) -> dict:
     import copy
+    if monster is None:
+        monster = random.choice(MONSTER_ROSTER)
     return {
         "messages":          [],
         "active_character":  "vex",
         "acting_character":  "vex",
-        "party":             copy.deepcopy(_DEBUG_PARTY),
-        "world":             copy.deepcopy(_DEBUG_WORLD),
+        "party":             copy.deepcopy(PARTY_ROSTER),
+        "world":             _fresh_world(monster),
         "ui_queue":          [],
         "narrative_history": [],
         "turn_count":        0,
@@ -68,6 +80,26 @@ def _fresh_state(session_id: str) -> dict:
         "next_agent":        "dm",
         "session_id":        session_id,
     }
+
+
+def _apply_monster_from_name(state: dict, enemy_name: str) -> None:
+    """Find monster in roster by name and apply to encounter state."""
+    monster = next(
+        (m for m in MONSTER_ROSTER if m["name"].lower() == enemy_name.lower()),
+        None
+    )
+    if monster:
+        state["world"]["current_encounter"].update({
+            "enemy_name":   monster["name"],
+            "enemy_hp":     monster["hp"],
+            "enemy_max_hp": monster["hp"],
+            "target_ac":    monster["ac"],
+        })
+        print(f"[graph] monster set → {monster['name']} (HP {monster['hp']}, AC {monster['ac']})")
+    else:
+        # Unknown monster — just set the name, keep existing stats
+        state["world"]["current_encounter"]["enemy_name"] = enemy_name
+        print(f"[graph] unknown monster '{enemy_name}' — name set, stats unchanged")
 
 
 async def run_turn(
@@ -94,7 +126,6 @@ async def run_turn(
     async for chunk in graph.astream(state, stream_mode="updates"):
         for node_name, updates in chunk.items():
             if isinstance(updates, dict):
-                # Pre-apply DM instructions so vibe_architect sees updated theme
                 if node_name == "dm":
                     for instruction in updates.get("ui_queue", []):
                         itype = instruction.get("type", "")
@@ -103,6 +134,9 @@ async def run_turn(
                             print(f"[graph] theme pre-applied → {instruction['theme']}")
                         elif itype == "update_world":
                             patch = instruction.get("world", {})
+                            enemy_name = patch.pop("enemy_name", None)
+                            if enemy_name:
+                                _apply_monster_from_name(state, enemy_name)
                             state["world"].update(patch)
                             if "inCombat" in patch:
                                 print(f"[graph] inCombat pre-applied → {patch['inCombat']}")
@@ -122,6 +156,9 @@ async def run_turn(
         elif itype == "update_world":
             world_patch = instruction.get("world", {})
             if world_patch:
+                enemy_name = world_patch.pop("enemy_name", None)
+                if enemy_name:
+                    _apply_monster_from_name(state, enemy_name)
                 state["world"].update(world_patch)
                 if "locationName" in world_patch:
                     print(f"[graph] location updated → {world_patch['locationName']}")
@@ -153,7 +190,14 @@ async def run_turn(
     }
 
 
-def reset_session(session_id: str):
+def set_session_monster(session_id: str, enemy_name: str) -> None:
+    """Called by opening_scene to set the monster after DM picks one."""
+    if session_id not in _session_states:
+        return
+    _apply_monster_from_name(_session_states[session_id], enemy_name)
+
+
+def reset_session(session_id: str) -> None:
     if session_id in _session_states:
         del _session_states[session_id]
         print(f"[graph] session {session_id} cleared")

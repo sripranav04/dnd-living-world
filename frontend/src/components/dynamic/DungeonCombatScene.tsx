@@ -35,338 +35,141 @@ export default function DungeonCombatScene() {
     const state  = animState.current;
     if (impactRef.current > 0) impactRef.current = Math.max(0, impactRef.current - 0.022);
     const impact = impactRef.current;
+    // DRAW BODY HERE
+    const cx = W * 0.5;
+    const cy = H * 0.42;
     const vpX = W * 0.5;
     const vpY = H * 0.45;
-    const enemyX = W * 0.5;
-    const enemyYBase = H * 0.42;
-    const bob = Math.sin(t * 1.2) * 8;
-    const breathe = 1 + Math.sin(t * 0.8) * 0.02;
-    const enemyY = enemyYBase + (state === 'idle' ? bob : 0);
-    const enemyH = H * 0.58;
+    const enemyH = H * 0.6;
     const enemyW = enemyH * 0.34;
-    const zombieBody = getCSSVar('--enemy-zombie-body', '#3a4a2a');
-    const bone = getCSSVar('--enemy-bone-color', '#c8b89a');
-    const cloth = getCSSVar('--enemy-cloth-color', '#4a4038');
-    const flesh = getCSSVar('--enemy-flesh-color', '#6a4a46');
-    const eye = getCSSVar('--enemy-eye-color', '#e8e6dc');
+    const bobY = Math.sin(t * 1.2) * 8;
+    const breathe = 1 + Math.sin(t * 0.8) * 0.02;
+    const enemyColor = getCSSVar('--enemy-skeleton-color', '#d4c9a8');
+    const boneShade = getCSSVar('--enemy-skeleton-shade', '#c8b89a');
+    const gapColor = getCSSVar('--enemy-gap-color', wall);
+    const clothColor = getCSSVar('--enemy-cloth-color', bg);
+    const eyeGlow = getCSSVar('--enemy-eye-color', accent);
 
     const wallGrad = ctx.createLinearGradient(0, 0, 0, H);
-    wallGrad.addColorStop(0, bg);
-    wallGrad.addColorStop(0.35, wall);
-    wallGrad.addColorStop(1, wall);
-
+    wallGrad.addColorStop(0, wall + 'ee');
+    wallGrad.addColorStop(0.45, wall + 'ff');
+    wallGrad.addColorStop(1, bg + 'ff');
     ctx.fillStyle = wallGrad;
     ctx.fillRect(0, 0, W, H);
 
-    const ceilingGrad = ctx.createLinearGradient(0, 0, 0, vpY);
-    ceilingGrad.addColorStop(0, bg);
-    ceilingGrad.addColorStop(1, wall + 'cc');
-    ctx.fillStyle = ceilingGrad;
+    ctx.fillStyle = wall + 'cc';
     ctx.beginPath();
     ctx.moveTo(0, 0);
-    ctx.lineTo(W, 0);
-    ctx.lineTo(W * 0.82, vpY);
-    ctx.lineTo(W * 0.18, vpY);
-    ctx.closePath();
-    ctx.fill();
-
-    const floorGrad = ctx.createLinearGradient(0, vpY, 0, H);
-    floorGrad.addColorStop(0, floorC + 'cc');
-    floorGrad.addColorStop(1, floorC);
-    ctx.fillStyle = floorGrad;
-    ctx.beginPath();
-    ctx.moveTo(0, H);
-    ctx.lineTo(W, H);
-    ctx.lineTo(W * 0.78, vpY);
-    ctx.lineTo(W * 0.22, vpY);
-    ctx.closePath();
-    ctx.fill();
-
-    ctx.fillStyle = wall + 'dd';
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(W * 0.18, vpY);
-    ctx.lineTo(W * 0.22, H);
+    ctx.lineTo(W * 0.18, 0);
+    ctx.lineTo(W * 0.28, H);
     ctx.lineTo(0, H);
     ctx.closePath();
     ctx.fill();
 
     ctx.beginPath();
     ctx.moveTo(W, 0);
-    ctx.lineTo(W * 0.82, vpY);
-    ctx.lineTo(W * 0.78, H);
+    ctx.lineTo(W * 0.82, 0);
+    ctx.lineTo(W * 0.72, H);
     ctx.lineTo(W, H);
     ctx.closePath();
     ctx.fill();
 
-    ctx.strokeStyle = accent + '22';
+    const ceilGrad = ctx.createLinearGradient(0, 0, 0, H * 0.28);
+    ceilGrad.addColorStop(0, bg + 'ff');
+    ceilGrad.addColorStop(1, wall + '00');
+    ctx.fillStyle = ceilGrad;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(W, 0);
+    ctx.lineTo(W * 0.72, H * 0.22);
+    ctx.lineTo(W * 0.28, H * 0.22);
+    ctx.closePath();
+    ctx.fill();
+
+    const floorGrad = ctx.createLinearGradient(0, vpY, 0, H);
+    floorGrad.addColorStop(0, floorC + 'aa');
+    floorGrad.addColorStop(1, floorC + 'ff');
+    ctx.fillStyle = floorGrad;
+    ctx.beginPath();
+    ctx.moveTo(0, H);
+    ctx.lineTo(W, H);
+    ctx.lineTo(W * 0.72, vpY);
+    ctx.lineTo(W * 0.28, vpY);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = accent + '18';
     ctx.lineWidth = 1;
-    for (let i = -6; i <= 6; i++) {
-      const x = vpX + i * (W * 0.08);
+    for (let i = -7; i <= 7; i++) {
+      const x = cx + i * (W * 0.08);
       ctx.beginPath();
       ctx.moveTo(x, H);
       ctx.lineTo(vpX, vpY);
       ctx.stroke();
     }
-    for (let i = 1; i <= 7; i++) {
-      const y = vpY + ((H - vpY) * i) / 8;
-      const inset = (W * 0.28 * i) / 8;
+    for (let i = 0; i < 8; i++) {
+      const y = vpY + i * (H * 0.07);
+      const spread = (y - vpY) * 1.8;
       ctx.beginPath();
-      ctx.moveTo(inset, y);
-      ctx.lineTo(W - inset, y);
+      ctx.moveTo(cx - spread, y);
+      ctx.lineTo(cx + spread, y);
       ctx.stroke();
     }
 
-    const drawTorch = (x: number, y: number, side: -1 | 1) => {
-      const flicker = 0.9 + Math.sin(t * 9 + x * 0.01) * 0.08 + Math.sin(t * 17 + y * 0.02) * 0.05;
-      const glow = ctx.createRadialGradient(x, y, 4, x, y, H * 0.14 * flicker);
+    const drawTorch = (x: number, y: number, side: number) => {
+      const glow = ctx.createRadialGradient(x, y, 4, x, y, H * 0.14);
       glow.addColorStop(0, torch + 'bb');
-      glow.addColorStop(0.35, torch + '55');
+      glow.addColorStop(0.35, torch + '44');
       glow.addColorStop(1, torch + '00');
       ctx.fillStyle = glow;
       ctx.beginPath();
-      ctx.arc(x, y, H * 0.14 * flicker, 0, Math.PI * 2);
+      ctx.arc(x, y, H * 0.14, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.strokeStyle = accent;
+      ctx.strokeStyle = boneShade;
       ctx.lineWidth = Math.max(2, W * 0.004);
       ctx.beginPath();
-      ctx.moveTo(x - side * W * 0.02, y - H * 0.015);
+      ctx.moveTo(x - side * W * 0.03, y - H * 0.02);
       ctx.lineTo(x, y);
-      ctx.lineTo(x - side * W * 0.02, y + H * 0.015);
+      ctx.lineTo(x - side * W * 0.03, y + H * 0.02);
       ctx.stroke();
 
-      ctx.fillStyle = accent + 'cc';
-      ctx.fillRect(x - 4, y - 10, 8, 20);
+      ctx.fillStyle = wall;
+      ctx.fillRect(x - 6, y - 12, 12, 24);
 
-      ctx.fillStyle = torch + 'dd';
+      const flicker = 1 + Math.sin(t * 14 + x * 0.01) * 0.12 + Math.sin(t * 23) * 0.06;
+      const flame = ctx.createRadialGradient(x, y - 8, 2, x, y - 8, 18 * flicker);
+      flame.addColorStop(0, getCSSVar('--torch-core-color', '#fff0b3'));
+      flame.addColorStop(0.45, torch + 'ee');
+      flame.addColorStop(1, torch + '00');
+      ctx.fillStyle = flame;
       ctx.beginPath();
-      ctx.moveTo(x, y - 18);
-      ctx.quadraticCurveTo(x + 10 * flicker, y - 4, x, y + 4);
-      ctx.quadraticCurveTo(x - 9 * flicker, y - 4, x, y - 18);
+      ctx.arc(x, y - 8, 18 * flicker, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = accent + '88';
+      ctx.fillStyle = torch;
       ctx.beginPath();
-      ctx.arc(x, y + 2, 3, 0, Math.PI * 2);
+      ctx.moveTo(x, y - 24 * flicker);
+      ctx.quadraticCurveTo(x + 8, y - 10, x, y - 2);
+      ctx.quadraticCurveTo(x - 8, y - 10, x, y - 24 * flicker);
       ctx.fill();
     };
 
-    drawTorch(W * 0.14, H * 0.3, -1);
-    drawTorch(W * 0.86, H * 0.3, 1);
+    drawTorch(W * 0.16, H * 0.3, -1);
+    drawTorch(W * 0.84, H * 0.3, 1);
 
-    const shadowGrad = ctx.createRadialGradient(enemyX, H * 0.72, 10, enemyX, H * 0.72, W * 0.18);
-    shadowGrad.addColorStop(0, bg + 'aa');
-    shadowGrad.addColorStop(1, bg + '00');
-    ctx.fillStyle = shadowGrad;
+    ctx.fillStyle = bg + '55';
     ctx.beginPath();
-    ctx.ellipse(enemyX, H * 0.72, W * 0.16, H * 0.05, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, H * 0.76, enemyW * 0.95, enemyH * 0.08, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    const drawZombie = () => {
-      const enemyGlow = ctx.createRadialGradient(W * 0.5, H * 0.42, 0, W * 0.5, H * 0.42, H * 0.35);
-      enemyGlow.addColorStop(0, zombieBody + '44');
-      enemyGlow.addColorStop(1, zombieBody + '00');
-      ctx.fillStyle = enemyGlow;
-      ctx.beginPath();
-      ctx.arc(enemyX, enemyY, H * 0.35, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.save();
-      ctx.translate(enemyX, enemyY);
-      if (state === 'idle') ctx.scale(breathe, breathe);
-
-      const torsoTop = -enemyH * 0.18;
-      const torsoBottom = enemyH * 0.2;
-      const shoulderY = -enemyH * 0.1;
-      const hipY = enemyH * 0.12;
-      const headR = enemyH * 0.12;
-
-      ctx.fillStyle = cloth;
-      ctx.beginPath();
-      ctx.moveTo(-enemyW * 0.42, torsoTop);
-      ctx.quadraticCurveTo(-enemyW * 0.5, 0, -enemyW * 0.34, torsoBottom);
-      ctx.lineTo(enemyW * 0.34, torsoBottom);
-      ctx.quadraticCurveTo(enemyW * 0.5, 0, enemyW * 0.42, torsoTop);
-      ctx.quadraticCurveTo(0, -enemyH * 0.28, -enemyW * 0.42, torsoTop);
-      ctx.closePath();
-      ctx.fill();
-
-      ctx.fillStyle = zombieBody;
-      ctx.beginPath();
-      ctx.moveTo(-enemyW * 0.34, torsoTop);
-      ctx.quadraticCurveTo(-enemyW * 0.46, -enemyH * 0.02, -enemyW * 0.28, torsoBottom);
-      ctx.lineTo(enemyW * 0.28, torsoBottom);
-      ctx.quadraticCurveTo(enemyW * 0.44, -enemyH * 0.02, enemyW * 0.34, torsoTop);
-      ctx.quadraticCurveTo(0, -enemyH * 0.22, -enemyW * 0.34, torsoTop);
-      ctx.closePath();
-      ctx.fill();
-
-      ctx.fillStyle = flesh;
-      ctx.beginPath();
-      ctx.ellipse(-enemyW * 0.1, enemyH * 0.02, enemyW * 0.08, enemyH * 0.06, -0.3, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.ellipse(enemyW * 0.14, -enemyH * 0.02, enemyW * 0.06, enemyH * 0.05, 0.2, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = bone;
-      ctx.beginPath();
-      ctx.ellipse(enemyW * 0.16, -enemyH * 0.01, enemyW * 0.03, enemyH * 0.045, 0.2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.ellipse(-enemyW * 0.11, enemyH * 0.03, enemyW * 0.035, enemyH * 0.05, -0.2, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = zombieBody;
-      ctx.beginPath();
-      ctx.ellipse(0, -enemyH * 0.28, enemyW * 0.22, headR, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = flesh;
-      ctx.beginPath();
-      ctx.ellipse(enemyW * 0.08, -enemyH * 0.25, enemyW * 0.06, enemyH * 0.04, 0.4, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.strokeStyle = bg + '88';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(-enemyW * 0.08, -enemyH * 0.31);
-      ctx.quadraticCurveTo(0, -enemyH * 0.34, enemyW * 0.08, -enemyH * 0.31);
-      ctx.stroke();
-
-      ctx.fillStyle = eye;
-      ctx.beginPath();
-      ctx.arc(-enemyW * 0.07, -enemyH * 0.285, enemyW * 0.028, 0, Math.PI * 2);
-      ctx.arc(enemyW * 0.05, -enemyH * 0.278, enemyW * 0.028, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = bg + '88';
-      ctx.beginPath();
-      ctx.arc(-enemyW * 0.07, -enemyH * 0.285, enemyW * 0.012, 0, Math.PI * 2);
-      ctx.arc(enemyW * 0.05, -enemyH * 0.278, enemyW * 0.012, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = bg + 'aa';
-      ctx.beginPath();
-      ctx.moveTo(-enemyW * 0.04, -enemyH * 0.22);
-      ctx.quadraticCurveTo(0, -enemyH * 0.16, enemyW * 0.04, -enemyH * 0.22);
-      ctx.lineTo(enemyW * 0.03, -enemyH * 0.12);
-      ctx.quadraticCurveTo(0, -enemyH * 0.08, -enemyW * 0.03, -enemyH * 0.12);
-      ctx.closePath();
-      ctx.fill();
-
-      ctx.strokeStyle = bone;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(-enemyW * 0.03, -enemyH * 0.12);
-      ctx.lineTo(-enemyW * 0.02, -enemyH * 0.08);
-      ctx.lineTo(0, -enemyH * 0.06);
-      ctx.lineTo(enemyW * 0.02, -enemyH * 0.08);
-      ctx.lineTo(enemyW * 0.03, -enemyH * 0.12);
-      ctx.stroke();
-
-      ctx.strokeStyle = zombieBody;
-      ctx.lineWidth = enemyW * 0.12;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(-enemyW * 0.22, shoulderY);
-      ctx.quadraticCurveTo(-enemyW * 0.5, -enemyH * 0.02, -enemyW * 0.72, enemyH * 0.12);
-      ctx.quadraticCurveTo(-enemyW * 0.92, enemyH * 0.22, -enemyW * 0.98, enemyH * 0.3);
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.moveTo(enemyW * 0.22, shoulderY);
-      ctx.quadraticCurveTo(enemyW * 0.52, -enemyH * 0.01, enemyW * 0.76, enemyH * 0.13);
-      ctx.quadraticCurveTo(enemyW * 0.96, enemyH * 0.24, enemyW * 1.02, enemyH * 0.32);
-      ctx.stroke();
-
-      ctx.strokeStyle = cloth;
-      ctx.lineWidth = enemyW * 0.08;
-      ctx.beginPath();
-      ctx.moveTo(-enemyW * 0.18, shoulderY + 4);
-      ctx.quadraticCurveTo(-enemyW * 0.42, enemyH * 0.02, -enemyW * 0.64, enemyH * 0.14);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(enemyW * 0.18, shoulderY + 4);
-      ctx.quadraticCurveTo(enemyW * 0.42, enemyH * 0.02, enemyW * 0.68, enemyH * 0.16);
-      ctx.stroke();
-
-      ctx.fillStyle = bone;
-      ctx.beginPath();
-      ctx.ellipse(-enemyW * 0.78, enemyH * 0.24, enemyW * 0.06, enemyH * 0.04, -0.4, 0, Math.PI * 2);
-      ctx.ellipse(enemyW * 0.82, enemyH * 0.26, enemyW * 0.065, enemyH * 0.045, 0.4, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = zombieBody;
-      ctx.beginPath();
-      ctx.ellipse(-enemyW * 0.98, enemyH * 0.31, enemyW * 0.11, enemyH * 0.07, -0.2, 0, Math.PI * 2);
-      ctx.ellipse(enemyW * 1.02, enemyH * 0.33, enemyW * 0.12, enemyH * 0.075, 0.2, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.strokeStyle = bone;
-      ctx.lineWidth = 2;
-      for (let i = -2; i <= 2; i++) {
-        ctx.beginPath();
-        ctx.moveTo(-enemyW * 1.02 + i * enemyW * 0.03, enemyH * 0.29);
-        ctx.lineTo(-enemyW * 1.06 + i * enemyW * 0.03, enemyH * 0.36);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(enemyW * 0.98 + i * enemyW * 0.03, enemyH * 0.31);
-        ctx.lineTo(enemyW * 1.02 + i * enemyW * 0.03, enemyH * 0.39);
-        ctx.stroke();
-      }
-
-      ctx.strokeStyle = zombieBody;
-      ctx.lineWidth = enemyW * 0.11;
-      ctx.beginPath();
-      ctx.moveTo(-enemyW * 0.14, hipY);
-      ctx.quadraticCurveTo(-enemyW * 0.18, enemyH * 0.28, -enemyW * 0.12, enemyH * 0.46);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(enemyW * 0.14, hipY);
-      ctx.quadraticCurveTo(enemyW * 0.2, enemyH * 0.28, enemyW * 0.12, enemyH * 0.48);
-      ctx.stroke();
-
-      ctx.strokeStyle = cloth;
-      ctx.lineWidth = enemyW * 0.07;
-      ctx.beginPath();
-      ctx.moveTo(-enemyW * 0.08, hipY);
-      ctx.lineTo(-enemyW * 0.06, enemyH * 0.46);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(enemyW * 0.08, hipY);
-      ctx.lineTo(enemyW * 0.05, enemyH * 0.48);
-      ctx.stroke();
-
-      ctx.fillStyle = bone;
-      ctx.beginPath();
-      ctx.ellipse(-enemyW * 0.12, enemyH * 0.47, enemyW * 0.04, enemyH * 0.03, 0, 0, Math.PI * 2);
-      ctx.ellipse(enemyW * 0.12, enemyH * 0.49, enemyW * 0.04, enemyH * 0.03, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = cloth;
-      ctx.beginPath();
-      ctx.moveTo(-enemyW * 0.34, torsoBottom - 4);
-      ctx.lineTo(-enemyW * 0.18, enemyH * 0.34);
-      ctx.lineTo(-enemyW * 0.04, torsoBottom + 8);
-      ctx.lineTo(enemyW * 0.06, enemyH * 0.36);
-      ctx.lineTo(enemyW * 0.22, torsoBottom + 4);
-      ctx.lineTo(enemyW * 0.34, enemyH * 0.32);
-      ctx.lineTo(enemyW * 0.3, torsoBottom - 2);
-      ctx.closePath();
-      ctx.fill();
-
-      ctx.strokeStyle = flesh;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(-enemyW * 0.18, -enemyH * 0.02);
-      ctx.lineTo(-enemyW * 0.08, enemyH * 0.08);
-      ctx.lineTo(0, enemyH * 0.02);
-      ctx.stroke();
-
-      ctx.restore();
-    };
+    const enemyGlow = ctx.createRadialGradient(W * 0.5, H * 0.42, 0, W * 0.5, H * 0.42, H * 0.35);
+    enemyGlow.addColorStop(0, enemyColor + '44');
+    enemyGlow.addColorStop(1, enemyColor + '00');
+    ctx.fillStyle = enemyGlow;
+    ctx.beginPath();
+    ctx.arc(cx, cy, H * 0.35, 0, Math.PI * 2);
+    ctx.fill();
 
     if (state === 'attack') {
       const atkScale = state === 'attack' ? 1.0 + Math.sin(t * 6) * 0.15 : 1.0;
@@ -374,64 +177,275 @@ export default function DungeonCombatScene() {
       ctx.translate(W * 0.5, H * 0.42);
       ctx.scale(atkScale, atkScale);
       ctx.translate(-W * 0.5, -H * 0.42);
-      drawZombie();
-      ctx.restore();
-      ctx.fillStyle = '#ff000022';
-      ctx.fillRect(0, 0, W, H);
     } else if (state === 'recoil') {
       const recoilX = 30;
       ctx.save();
       ctx.translate(recoilX, 0);
       ctx.scale(0.85, 0.85);
-      drawZombie();
-      ctx.restore();
+    }
 
-      for (let i = 0; i < 18; i++) {
-        const a = (Math.PI * 2 * i) / 18 + t * 2;
-        const r = impact * (30 + i * 3);
-        const px = enemyX + Math.cos(a) * r;
-        const py = enemyY + enemyH * 0.02 + Math.sin(a) * r * 0.6;
-        ctx.fillStyle = accent + (i % 2 === 0 ? 'dd' : '99');
+    ctx.save();
+    ctx.translate(0, bobY);
+    ctx.translate(cx, cy);
+    ctx.scale(breathe, breathe);
+    ctx.translate(-cx, -cy);
+
+    const skullR = enemyH * 0.09;
+    const torsoTop = cy - enemyH * 0.12;
+    const pelvisY = cy + enemyH * 0.16;
+    const shoulderY = cy - enemyH * 0.02;
+    const hipY = cy + enemyH * 0.18;
+
+    ctx.strokeStyle = enemyColor;
+    ctx.fillStyle = enemyColor;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    ctx.lineWidth = Math.max(4, enemyW * 0.08);
+    ctx.beginPath();
+    ctx.moveTo(cx, torsoTop + skullR * 1.2);
+    ctx.lineTo(cx, pelvisY);
+    ctx.stroke();
+
+    for (let i = -1; i <= 1; i += 2) {
+      ctx.lineWidth = Math.max(3, enemyW * 0.05);
+      ctx.beginPath();
+      ctx.moveTo(cx, shoulderY);
+      ctx.lineTo(cx + i * enemyW * 0.42, shoulderY + enemyH * 0.03);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(cx, hipY);
+      ctx.lineTo(cx + i * enemyW * 0.22, hipY + enemyH * 0.05);
+      ctx.stroke();
+    }
+
+    for (let i = 0; i < 5; i++) {
+      const ry = torsoTop + enemyH * 0.05 + i * enemyH * 0.045;
+      const rw = enemyW * (0.5 - i * 0.05);
+      ctx.lineWidth = Math.max(2, enemyW * 0.035);
+      ctx.beginPath();
+      ctx.moveTo(cx - rw, ry);
+      ctx.lineTo(cx - enemyW * 0.08, ry + enemyH * 0.015);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(cx + enemyW * 0.08, ry + enemyH * 0.015);
+      ctx.lineTo(cx + rw, ry);
+      ctx.stroke();
+    }
+
+    ctx.strokeStyle = gapColor;
+    ctx.lineWidth = Math.max(2, enemyW * 0.03);
+    for (let i = 0; i < 4; i++) {
+      const gy = torsoTop + enemyH * 0.08 + i * enemyH * 0.05;
+      ctx.beginPath();
+      ctx.moveTo(cx - enemyW * 0.06, gy);
+      ctx.lineTo(cx + enemyW * 0.06, gy);
+      ctx.stroke();
+    }
+
+    ctx.fillStyle = enemyColor;
+    ctx.beginPath();
+    ctx.arc(cx, cy - enemyH * 0.2, skullR, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = boneShade;
+    ctx.lineWidth = Math.max(2, enemyW * 0.03);
+    ctx.beginPath();
+    ctx.arc(cx, cy - enemyH * 0.2, skullR, Math.PI * 0.15, Math.PI * 0.85);
+    ctx.stroke();
+
+    ctx.fillStyle = gapColor;
+    ctx.beginPath();
+    ctx.arc(cx - skullR * 0.35, cy - enemyH * 0.21, skullR * 0.18, 0, Math.PI * 2);
+    ctx.arc(cx + skullR * 0.35, cy - enemyH * 0.21, skullR * 0.18, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = eyeGlow;
+    ctx.beginPath();
+    ctx.arc(cx + skullR * 0.35, cy - enemyH * 0.21, skullR * 0.08, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - enemyH * 0.19);
+    ctx.lineTo(cx - skullR * 0.08, cy - enemyH * 0.14);
+    ctx.lineTo(cx + skullR * 0.08, cy - enemyH * 0.14);
+    ctx.closePath();
+    ctx.fillStyle = gapColor;
+    ctx.fill();
+
+    ctx.strokeStyle = enemyColor;
+    ctx.lineWidth = Math.max(4, enemyW * 0.05);
+
+    const leftShoulderX = cx - enemyW * 0.42;
+    const rightShoulderX = cx + enemyW * 0.42;
+    const leftElbowX = cx - enemyW * 0.78;
+    const leftElbowY = cy + enemyH * 0.02;
+    const leftHandX = cx - enemyW * 0.98;
+    const leftHandY = cy + enemyH * 0.12;
+
+    const rightElbowX = cx + enemyW * 0.18;
+    const rightElbowY = cy - enemyH * 0.02;
+    const rightHandX = cx + enemyW * 0.52;
+    const rightHandY = cy - enemyH * 0.08;
+
+    ctx.beginPath();
+    ctx.moveTo(leftShoulderX, shoulderY + enemyH * 0.03);
+    ctx.lineTo(leftElbowX, leftElbowY);
+    ctx.lineTo(leftHandX, leftHandY);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(rightShoulderX, shoulderY + enemyH * 0.03);
+    ctx.lineTo(rightElbowX, rightElbowY);
+    ctx.lineTo(rightHandX, rightHandY);
+    ctx.stroke();
+
+    const bowTopX = cx + enemyW * 0.62;
+    const bowTopY = cy - enemyH * 0.22;
+    const bowBotX = cx + enemyW * 0.72;
+    const bowBotY = cy + enemyH * 0.18;
+    ctx.strokeStyle = boneShade;
+    ctx.lineWidth = Math.max(3, enemyW * 0.035);
+    ctx.beginPath();
+    ctx.moveTo(bowTopX, bowTopY);
+    ctx.quadraticCurveTo(cx + enemyW * 0.92, cy - enemyH * 0.02, bowBotX, bowBotY);
+    ctx.stroke();
+
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(bowTopX, bowTopY);
+    ctx.lineTo(bowBotX, bowBotY);
+    ctx.stroke();
+
+    ctx.strokeStyle = boneShade;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(rightHandX, rightHandY);
+    ctx.lineTo(cx + enemyW * 0.1, cy - enemyH * 0.03);
+    ctx.stroke();
+
+    ctx.fillStyle = boneShade;
+    ctx.beginPath();
+    ctx.moveTo(cx + enemyW * 0.1, cy - enemyH * 0.03);
+    ctx.lineTo(cx + enemyW * 0.18, cy - enemyH * 0.05);
+    ctx.lineTo(cx + enemyW * 0.18, cy - enemyH * 0.01);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = enemyColor;
+    ctx.lineWidth = Math.max(4, enemyW * 0.05);
+    ctx.beginPath();
+    ctx.moveTo(cx - enemyW * 0.18, hipY + enemyH * 0.05);
+    ctx.lineTo(cx - enemyW * 0.24, cy + enemyH * 0.42);
+    ctx.lineTo(cx - enemyW * 0.3, cy + enemyH * 0.62);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(cx + enemyW * 0.18, hipY + enemyH * 0.05);
+    ctx.lineTo(cx + enemyW * 0.24, cy + enemyH * 0.42);
+    ctx.lineTo(cx + enemyW * 0.3, cy + enemyH * 0.62);
+    ctx.stroke();
+
+    ctx.strokeStyle = boneShade;
+    ctx.lineWidth = Math.max(3, enemyW * 0.04);
+    ctx.beginPath();
+    ctx.moveTo(cx - enemyW * 0.3, cy + enemyH * 0.62);
+    ctx.lineTo(cx - enemyW * 0.38, cy + enemyH * 0.72);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx + enemyW * 0.3, cy + enemyH * 0.62);
+    ctx.lineTo(cx + enemyW * 0.38, cy + enemyH * 0.72);
+    ctx.stroke();
+
+    ctx.fillStyle = clothColor + 'aa';
+    const strips = [
+      [leftElbowX, leftElbowY, -1],
+      [rightElbowX, rightElbowY, 1],
+      [cx - enemyW * 0.12, hipY + enemyH * 0.03, -1],
+      [cx + enemyW * 0.12, hipY + enemyH * 0.03, 1],
+    ] as const;
+    strips.forEach(([sx, sy, dir], i) => {
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(sx + dir * enemyW * (0.08 + i * 0.01), sy + enemyH * 0.08);
+      ctx.lineTo(sx + dir * enemyW * (0.02 + i * 0.01), sy + enemyH * 0.16);
+      ctx.closePath();
+      ctx.fill();
+    });
+
+    if (impact > 0) {
+      ctx.strokeStyle = accent + 'cc';
+      ctx.lineWidth = Math.max(2, enemyW * 0.025);
+      ctx.beginPath();
+      ctx.moveTo(cx - enemyW * 0.18, cy + enemyH * 0.02);
+      ctx.lineTo(cx + enemyW * 0.04, cy - enemyH * 0.02);
+      ctx.stroke();
+
+      ctx.fillStyle = accent + 'aa';
+      for (let i = 0; i < 14; i++) {
+        const a = -0.8 + i * 0.14 + Math.sin(t * 8 + i) * 0.08;
+        const r = enemyW * (0.08 + i * 0.012) * impact;
+        ctx.beginPath();
+        ctx.arc(cx + r * Math.cos(a), cy + enemyH * 0.02 + r * Math.sin(a), 2 + impact * 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    ctx.restore();
+
+    if (state === 'recoil') {
+      ctx.fillStyle = accent + 'cc';
+      for (let i = 0; i < 22; i++) {
+        const a = -0.9 + (i / 21) * 1.8;
+        const speed = 30 + i * 3;
+        const px = cx + Math.cos(a) * speed * impact + Math.sin(t * 10 + i) * 4;
+        const py = cy + Math.sin(a) * speed * impact * 0.7;
         ctx.beginPath();
         ctx.arc(px, py, 2 + (i % 3), 0, Math.PI * 2);
         ctx.fill();
       }
-    } else {
-      drawZombie();
     }
 
-    const weaponGrad = ctx.createLinearGradient(0, H * 0.82, 0, H);
-    weaponGrad.addColorStop(0, accent + '66');
-    weaponGrad.addColorStop(1, accent + 'cc');
+    if (state === 'attack' || state === 'recoil') {
+      ctx.restore();
+    }
 
-    ctx.fillStyle = getCSSVar('--player-glove-color', '#5a4632');
+    const handY = H * 0.9;
+    const handX = W * 0.5;
+    ctx.fillStyle = getCSSVar('--player-glove-color', wall);
     ctx.beginPath();
-    ctx.moveTo(W * 0.43, H * 0.96);
-    ctx.quadraticCurveTo(W * 0.445, H * 0.88, W * 0.47, H * 0.84);
-    ctx.quadraticCurveTo(W * 0.5, H * 0.82, W * 0.53, H * 0.84);
-    ctx.quadraticCurveTo(W * 0.555, H * 0.88, W * 0.57, H * 0.96);
+    ctx.moveTo(handX - W * 0.05, H);
+    ctx.lineTo(handX - W * 0.035, handY);
+    ctx.lineTo(handX + W * 0.035, handY);
+    ctx.lineTo(handX + W * 0.05, H);
     ctx.closePath();
     ctx.fill();
 
-    ctx.fillStyle = weaponGrad;
+    ctx.fillStyle = accent;
     ctx.beginPath();
-    ctx.moveTo(W * 0.49, H * 0.9);
-    ctx.lineTo(W * 0.51, H * 0.9);
-    ctx.lineTo(W * 0.535, H * 0.72);
-    ctx.lineTo(W * 0.5, H * 0.62);
-    ctx.lineTo(W * 0.465, H * 0.72);
+    ctx.moveTo(handX - W * 0.008, handY);
+    ctx.lineTo(handX + W * 0.008, handY);
+    ctx.lineTo(handX + W * 0.02, H * 0.76);
+    ctx.lineTo(handX - W * 0.02, H * 0.76);
     ctx.closePath();
     ctx.fill();
 
-    ctx.strokeStyle = accent;
-    ctx.lineWidth = 2;
+    ctx.fillStyle = boneShade;
     ctx.beginPath();
-    ctx.moveTo(W * 0.49, H * 0.9);
-    ctx.lineTo(W * 0.5, H * 0.62);
-    ctx.lineTo(W * 0.51, H * 0.9);
-    ctx.stroke();
+    ctx.moveTo(handX, H * 0.72);
+    ctx.lineTo(handX + W * 0.012, H * 0.76);
+    ctx.lineTo(handX - W * 0.012, H * 0.76);
+    ctx.closePath();
+    ctx.fill();
 
-    const vignette = ctx.createRadialGradient(W * 0.5, H * 0.5, H * 0.25, W * 0.5, H * 0.5, H * 0.75);
+    if (state === 'attack') {
+      ctx.fillStyle = '#ff000022';
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    const vignette = ctx.createRadialGradient(cx, H * 0.5, H * 0.25, cx, H * 0.5, H * 0.78);
     vignette.addColorStop(0, bg + '00');
     vignette.addColorStop(1, bg + '77');
     ctx.fillStyle = vignette;
