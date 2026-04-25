@@ -4,7 +4,6 @@ from mechanics.open5e import fetch_monster_sync
 from state import AgentState
 from langchain_core.messages import SystemMessage
 
-# Enemy attack expressions by monster
 ENEMY_ATTACK_STATS = {
     "shadow wraith":   {"attack_bonus": 6, "damage": "2d6+3", "attack_name": "Corrupting Touch"},
     "skeleton archer": {"attack_bonus": 4, "damage": "1d6+2", "attack_name": "Shortbow"},
@@ -20,24 +19,32 @@ def _get_enemy_stats(enemy_name: str) -> dict:
     )
 
 
+def _check_combat_end(encounter: dict, party: dict) -> str | None:
+    """Returns combat end status or None if combat continues."""
+    if encounter.get("enemy_hp", 1) <= 0:
+        return "enemy_defeated"
+    if all(c.get("hp", 0) <= 0 for c in party.values()):
+        return "party_wiped"
+    return None
+
+
 def _resolve_enemy_attack(encounter: dict, party: dict) -> str | None:
-    """Resolve enemy counter-attack against a random living party member."""
+    """Resolve enemy counter-attack. Returns narrative line or None."""
     enemy_name = encounter.get("enemy_name", "Enemy")
     enemy_hp   = encounter.get("enemy_hp", 0)
 
     if enemy_hp <= 0:
-        return None  # Enemy is dead, no retaliation
+        return None
 
     stats = _get_enemy_stats(enemy_name)
 
-    # Pick a random living target
     living = [c for c in party.values() if c.get("hp", 0) > 0]
     if not living:
         return None
 
-    target     = random.choice(living)
+    target      = random.choice(living)
     target_name = target.get("name", "the party")
-    target_ac  = target.get("ac", 13)
+    target_ac   = target.get("ac", 13)
 
     resolution = resolve_attack(
         attack_bonus=stats["attack_bonus"],
@@ -49,22 +56,22 @@ def _resolve_enemy_attack(encounter: dict, party: dict) -> str | None:
         damage = resolution["damage"] or 0
         target["hp"] = max(0, target["hp"] - damage)
         hp_left = target["hp"]
-        crit = " — CRITICAL HIT" if resolution["critical_hit"] else ""
+        crit    = " — CRITICAL HIT" if resolution["critical_hit"] else ""
+        downed  = f" {target_name} is DOWNED." if hp_left <= 0 else ""
         line = (
             f"{enemy_name} uses {stats['attack_name']} against {target_name}: "
             f"rolled {resolution['attack_roll']} vs AC {target_ac}{crit}. "
             f"HIT. Damage: {damage} ({stats['damage']}). "
-            f"{target_name} HP remaining: {hp_left}."
+            f"{target_name} HP remaining: {hp_left}.{downed}"
         )
-        print(f"[enemy] {line}")
-        return line
     else:
         line = (
             f"{enemy_name} uses {stats['attack_name']} against {target_name}: "
             f"rolled {resolution['attack_roll']} vs AC {target_ac}. MISS."
         )
-        print(f"[enemy] {line}")
-        return line
+
+    print(f"[enemy] {line}")
+    return line
 
 
 def mechanics_node(state: AgentState) -> dict:
@@ -77,8 +84,8 @@ def mechanics_node(state: AgentState) -> dict:
         return {"next_agent": "dm"}
 
     action_lower = last_message.lower()
-    is_attack = any(w in action_lower for w in
-                    ["attack", "strike", "hit", "swing", "shoot", "cast", "spell"])
+    is_attack    = any(w in action_lower for w in
+                       ["attack", "strike", "hit", "swing", "shoot", "cast", "spell"])
 
     # ── Turn order validation ─────────────────────────────
     initiative_order = encounter.get("initiative_order", [])
@@ -106,28 +113,34 @@ def mechanics_node(state: AgentState) -> dict:
     char_id = active_char_id or current_turn or next(iter(party), "")
 
     # ── Advance turn ──────────────────────────────────────
-    next_turn = current_turn
+    next_turn         = current_turn
     enemy_retaliation = None
 
     if initiative_order and current_turn:
-        current_index = initiative_order.index(current_turn) if current_turn in initiative_order else 0
+        current_index = (initiative_order.index(current_turn)
+                         if current_turn in initiative_order else 0)
         next_index    = (current_index + 1) % len(initiative_order)
         next_turn     = initiative_order[next_index]
 
-        # New round started — resolve enemy retaliation
         if next_index == 0:
             encounter["round_number"] = encounter.get("round_number", 1) + 1
             enemy_retaliation = _resolve_enemy_attack(encounter, party)
 
         encounter["current_turn"] = next_turn
         world["current_encounter"] = encounter
-        print(f"[turn] {current_turn} acted → next: {next_turn} (round {encounter.get('round_number', 1)})")
+        print(f"[turn] {current_turn} acted → next: {next_turn} "
+              f"(round {encounter.get('round_number', 1)})")
 
-    # ── Non-attack: advance turn but skip dice ────────────
+    # ── Check combat end after retaliation ────────────────
+    combat_status = _check_combat_end(encounter, party)
+
+    # ── Non-attack action ─────────────────────────────────
     if not is_attack:
         parts = ["[NON-COMBAT ACTION — no dice rolled]"]
         if enemy_retaliation:
             parts.append(f"\n[ENEMY RETALIATION]\n{enemy_retaliation}")
+        if combat_status == "party_wiped":
+            parts.append("\n[COMBAT END — DEFEAT] All party members are downed. Narrate a dramatic defeat.")
         injection = SystemMessage(content="\n".join(parts))
         return {
             "messages":         [injection],
@@ -150,7 +163,7 @@ def mechanics_node(state: AgentState) -> dict:
                 world["current_encounter"] = encounter
                 print(f"[open5e] {monster['name']}: AC {monster['ac']}, HP {monster['hp']}")
         except Exception as e:
-            print(f"[open5e] lookup failed, using defaults: {e}")
+            print(f"[open5e] lookup failed: {e}")
 
     # ── Resolve player attack ─────────────────────────────
     active_char  = party.get(char_id, next(iter(party.values()), {}))
@@ -173,17 +186,57 @@ def mechanics_node(state: AgentState) -> dict:
     mechanics_summary = _format_for_narrator(
         resolution, active_char.get("name", char_id), enemy_hp_remaining
     )
+    print(f"[mechanics] {mechanics_summary}")
 
-    # ── Build injection with optional enemy retaliation ───
-    content_parts = [
+    # ── Check combat end after player attack ──────────────
+    combat_status = _check_combat_end(encounter, party)
+
+    # ── Build full injection ──────────────────────────────
+    parts = [
         "[MECHANICS RESOLVED — do NOT re-roll or invent numbers]",
         mechanics_summary,
     ]
-    if enemy_retaliation:
-        content_parts.append(f"\n[ENEMY RETALIATION — narrate this too]\n{enemy_retaliation}")
 
-    injection = SystemMessage(content="\n".join(content_parts))
-    print(f"[mechanics] {mechanics_summary}")
+    if enemy_retaliation:
+        parts.append(f"\n[ENEMY RETALIATION — narrate this too]\n{enemy_retaliation}")
+
+        if combat_status == "enemy_defeated":
+         parts.append(
+            "\n[COMBAT END — VICTORY] The enemy has been defeated. "
+            "Narrate a dramatic victory. "
+            "You MUST emit: update_world with inCombat:false, "
+            "update_session with xp:150 and kills:1, "
+            "combat_log_entry describing the kill."
+        )
+        world["inCombat"] = False
+        # Also directly add update_session to ui_queue so it can't be missed
+        state.setdefault("ui_queue", []).append({
+            "type": "update_session",
+            "stats": {"xp": 150, "kills": 1}
+        })
+        print(f"[combat] VICTORY — {encounter.get('enemy_name')} defeated")
+    elif combat_status == "party_wiped":
+            parts.append(
+                "\n[COMBAT END — DEFEAT] All party members are downed. "
+                "Narrate a dramatic defeat. Emit update_world with inCombat:false."
+            )
+            world["inCombat"] = False
+            print(f"[combat] DEFEAT — party wiped")
+
+    # ── Check individual downed characters ────────────────
+    newly_downed = [
+        c.get("name", cid) for cid, c in party.items()
+        if c.get("hp", 0) <= 0
+    ]
+    if newly_downed and combat_status != "party_wiped":
+        downed_names = ", ".join(newly_downed)
+        parts.append(
+            f"\n[CHARACTER DOWNED] {downed_names} has been downed (HP 0). "
+            f"Emit update_stats with isDowned:true for them. "
+            f"They skip turns until a Cleric uses Revive."
+        )
+
+    injection = SystemMessage(content="\n".join(parts))
 
     return {
         "messages":         [injection],
@@ -200,12 +253,14 @@ def _format_for_narrator(r: dict, attacker: str, enemy_hp_remaining: int = None)
         " — CRITICAL MISS" if r["critical_miss"] else ""
     )
     if r["hit"]:
-        hp_line = f" Enemy HP remaining: {enemy_hp_remaining}." if enemy_hp_remaining is not None else ""
+        hp_line = (f" Enemy HP remaining: {enemy_hp_remaining}."
+                   if enemy_hp_remaining is not None else "")
         return (
             f"{attacker} rolled {r['attack_roll']} to hit "
             f"(dice: {r['attack_dice']}, modifier: +{r['attack_modifier']}) "
             f"vs AC {r['target_ac']}{crit_tag}. "
-            f"HIT. Damage: {r['damage']} ({r['damage_expression']}, rolls: {r['damage_rolls']}).{hp_line}"
+            f"HIT. Damage: {r['damage']} ({r['damage_expression']}, "
+            f"rolls: {r['damage_rolls']}).{hp_line}"
         )
     return (
         f"{attacker} rolled {r['attack_roll']} to hit "

@@ -36,7 +36,10 @@ export interface WorldState {
   description: string;
   conditions: string[];
   round: number | null;
-  inCombat: boolean;
+    inCombat: boolean;
+  enemyName: string;     
+  enemyHp: number;        
+  enemyMaxHp: number; 
 }
 
 export interface NarrativeEntry {
@@ -323,9 +326,23 @@ export const useGameStore = create<GameStore>((set, get) => ({
         });
         break;
 
-      case 'update_world':
-        store.setWorld(instruction.world);
-        break;
+     case 'update_world': {
+  const patch = instruction.world;
+  const wasInCombat = store.world.inCombat;  // read BEFORE setWorld
+  store.setWorld(patch);
+
+  if (patch.inCombat === true && !wasInCombat) {
+    store.mountComponent('map-overlay', 'CombatHUD');
+  }
+
+  if (patch.inCombat === false && wasInCombat) {
+    store.mountComponent('map-overlay', null);
+    store.setWorld({ enemyName: '', enemyHp: 0, enemyMaxHp: 0 });
+    store.mountComponent('narrative-extra', 'LootDisplay');
+    setTimeout(() => store.mountComponent('narrative-extra', null), 10000);
+  }
+  break;
+}
 
       case 'update_initiative':
         store.setInitiative(instruction.order);

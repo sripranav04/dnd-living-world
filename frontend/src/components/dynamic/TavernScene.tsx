@@ -38,182 +38,201 @@ export default function TavernScene() {
     // DRAW BODY HERE
     const vpX = W * 0.5;
     const vpY = H * 0.45;
+    const torchY = H * 0.3;
+    const leftTorchX = W * 0.16;
+    const rightTorchX = W * 0.84;
+    const mistDrift = Math.sin(t * 0.25) * W * 0.015;
 
-    const wallGrad = ctx.createLinearGradient(0, 0, W, 0);
-    wallGrad.addColorStop(0, wall);
-    wallGrad.addColorStop(0.5, bg);
-    wallGrad.addColorStop(1, wall);
-    ctx.fillStyle = wallGrad;
+    const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
+    bgGrad.addColorStop(0, wall);
+    bgGrad.addColorStop(0.45, bg);
+    bgGrad.addColorStop(1, floorC);
+    ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, W, H);
 
-    const ceilGrad = ctx.createLinearGradient(0, 0, 0, H * 0.35);
-    ceilGrad.addColorStop(0, wall);
-    ceilGrad.addColorStop(1, bg + '00');
-    ctx.fillStyle = ceilGrad;
+    ctx.fillStyle = wall;
     ctx.beginPath();
     ctx.moveTo(0, 0);
-    ctx.lineTo(W, 0);
-    ctx.lineTo(W * 0.72, vpY);
-    ctx.lineTo(W * 0.28, vpY);
+    ctx.lineTo(W * 0.34, 0);
+    ctx.lineTo(vpX, vpY);
+    ctx.lineTo(W * 0.22, H);
+    ctx.lineTo(0, H);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(W, 0);
+    ctx.lineTo(W * 0.66, 0);
+    ctx.lineTo(vpX, vpY);
+    ctx.lineTo(W * 0.78, H);
+    ctx.lineTo(W, H);
+    ctx.closePath();
+    ctx.fill();
+
+    const ceilGrad = ctx.createLinearGradient(0, 0, 0, vpY);
+    ceilGrad.addColorStop(0, bg);
+    ceilGrad.addColorStop(1, wall + '00');
+    ctx.fillStyle = ceilGrad;
+    ctx.beginPath();
+    ctx.moveTo(W * 0.34, 0);
+    ctx.lineTo(W * 0.66, 0);
+    ctx.lineTo(vpX, vpY);
     ctx.closePath();
     ctx.fill();
 
     const floorGrad = ctx.createLinearGradient(0, vpY, 0, H);
-    floorGrad.addColorStop(0, floorC + 'cc');
+    floorGrad.addColorStop(0, floorC + '66');
     floorGrad.addColorStop(1, floorC);
     ctx.fillStyle = floorGrad;
     ctx.beginPath();
-    ctx.moveTo(0, H);
-    ctx.lineTo(W, H);
-    ctx.lineTo(W * 0.72, vpY);
-    ctx.lineTo(W * 0.28, vpY);
+    ctx.moveTo(vpX, vpY);
+    ctx.lineTo(W * 0.22, H);
+    ctx.lineTo(W * 0.78, H);
     ctx.closePath();
     ctx.fill();
 
-    ctx.strokeStyle = wall + 'aa';
-    ctx.lineWidth = Math.max(2, W * 0.004);
-    for (let i = 0; i <= 8; i++) {
-      const y = vpY + ((H - vpY) * i) / 8;
-      const inset = ((y - vpY) / (H - vpY)) * W * 0.48;
-      ctx.beginPath();
-      ctx.moveTo(vpX - inset, y);
-      ctx.lineTo(vpX + inset, y);
-      ctx.stroke();
-    }
-
-    for (let i = -6; i <= 6; i++) {
-      const x = vpX + i * (W * 0.08);
+    ctx.strokeStyle = accent + '22';
+    ctx.lineWidth = Math.max(1, W * 0.002);
+    for (let i = -5; i <= 5; i++) {
+      const x = vpX + i * (W * 0.06);
       ctx.beginPath();
       ctx.moveTo(x, H);
       ctx.lineTo(vpX, vpY);
       ctx.stroke();
     }
 
-    ctx.strokeStyle = wall + 'dd';
-    ctx.lineWidth = Math.max(3, W * 0.006);
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(W * 0.28, vpY);
-    ctx.lineTo(0, H);
-    ctx.stroke();
+    for (let i = 1; i <= 8; i++) {
+      const p = i / 9;
+      const y = vpY + (H - vpY) * p * p;
+      const inset = (W * 0.28) * (1 - p);
+      ctx.strokeStyle = accent + (i < 4 ? '18' : '10');
+      ctx.beginPath();
+      ctx.moveTo(W * 0.22 + inset, y);
+      ctx.lineTo(W * 0.78 - inset, y);
+      ctx.stroke();
+    }
 
-    ctx.beginPath();
-    ctx.moveTo(W, 0);
-    ctx.lineTo(W * 0.72, vpY);
-    ctx.lineTo(W, H);
-    ctx.stroke();
-
-    const torchY = H * 0.3;
-    const torchOffset = Math.sin(t * 7) * 0.5 + Math.sin(t * 11) * 0.35;
-
-    const drawTorch = (x: number, facing: 1 | -1) => {
-      const glow = ctx.createRadialGradient(x, torchY, 4, x, torchY, W * 0.12);
-      glow.addColorStop(0, torch + 'bb');
-      glow.addColorStop(0.35, accent + '55');
+    const drawTorch = (x: number, y: number, side: -1 | 1) => {
+      const flicker = 0.9 + Math.sin(t * 8 + x * 0.01) * 0.08 + Math.sin(t * 13 + x * 0.02) * 0.05;
+      const glow = ctx.createRadialGradient(x, y, 0, x, y, H * 0.16);
+      glow.addColorStop(0, torch + 'aa');
+      glow.addColorStop(0.35, torch + '44');
       glow.addColorStop(1, torch + '00');
       ctx.fillStyle = glow;
       ctx.beginPath();
-      ctx.arc(x, torchY, W * 0.12, 0, Math.PI * 2);
+      ctx.arc(x, y, H * 0.16 * flicker, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.strokeStyle = accent;
-      ctx.lineWidth = Math.max(3, W * 0.005);
+      ctx.lineWidth = Math.max(2, W * 0.004);
       ctx.beginPath();
-      ctx.moveTo(x - facing * W * 0.03, torchY);
-      ctx.lineTo(x, torchY);
-      ctx.lineTo(x + facing * W * 0.012, torchY + H * 0.03);
+      ctx.moveTo(x - side * W * 0.03, y + H * 0.015);
+      ctx.lineTo(x, y);
+      ctx.lineTo(x - side * W * 0.018, y - H * 0.03);
       ctx.stroke();
 
       ctx.fillStyle = accent;
-      ctx.beginPath();
-      ctx.arc(x, torchY, W * 0.008, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.fillRect(x - W * 0.008, y - H * 0.01, W * 0.016, H * 0.02);
 
       ctx.fillStyle = torch;
       ctx.beginPath();
-      ctx.moveTo(x, torchY - H * 0.03 - torchOffset * 2);
-      ctx.quadraticCurveTo(x - W * 0.012, torchY - H * 0.005, x, torchY + H * 0.012);
-      ctx.quadraticCurveTo(x + W * 0.014, torchY - H * 0.004, x, torchY - H * 0.03 - torchOffset * 2);
+      ctx.moveTo(x, y - H * 0.035);
+      ctx.quadraticCurveTo(x + W * 0.012, y - H * 0.01, x, y + H * 0.008);
+      ctx.quadraticCurveTo(x - W * 0.012, y - H * 0.01, x, y - H * 0.035);
       ctx.fill();
 
       ctx.fillStyle = accent + 'cc';
       ctx.beginPath();
-      ctx.moveTo(x, torchY - H * 0.018 - torchOffset);
-      ctx.quadraticCurveTo(x - W * 0.006, torchY - H * 0.002, x, torchY + H * 0.006);
-      ctx.quadraticCurveTo(x + W * 0.007, torchY - H * 0.002, x, torchY - H * 0.018 - torchOffset);
+      ctx.arc(x, y - H * 0.008, W * 0.004, 0, Math.PI * 2);
       ctx.fill();
     };
 
-    drawTorch(W * 0.16, 1);
-    drawTorch(W * 0.84, -1);
+    drawTorch(leftTorchX, torchY, -1);
+    drawTorch(rightTorchX, torchY, 1);
 
-    for (let i = 0; i < 18; i++) {
-      const my = ((i * 37 + t * 18) % H);
-      const mx = vpX + Math.sin(i * 12.7 + t * 0.7) * W * 0.22;
-      const mr = W * (0.03 + (i % 4) * 0.01);
-      const mist = ctx.createRadialGradient(mx, my, 0, mx, my, mr);
-      mist.addColorStop(0, bg + '22');
+    const torchBeamL = ctx.createRadialGradient(leftTorchX, torchY, 0, leftTorchX + W * 0.12, torchY + H * 0.08, W * 0.28);
+    torchBeamL.addColorStop(0, torch + '33');
+    torchBeamL.addColorStop(1, torch + '00');
+    ctx.fillStyle = torchBeamL;
+    ctx.fillRect(0, 0, W, H);
+
+    const torchBeamR = ctx.createRadialGradient(rightTorchX, torchY, 0, rightTorchX - W * 0.12, torchY + H * 0.08, W * 0.28);
+    torchBeamR.addColorStop(0, torch + '33');
+    torchBeamR.addColorStop(1, torch + '00');
+    ctx.fillStyle = torchBeamR;
+    ctx.fillRect(0, 0, W, H);
+
+    for (let i = 0; i < 5; i++) {
+      const layerY = vpY + H * (0.05 + i * 0.08);
+      const layerH = H * (0.08 + i * 0.03);
+      const mist = ctx.createLinearGradient(0, layerY, 0, layerY + layerH);
+      mist.addColorStop(0, bg + '00');
+      mist.addColorStop(0.5, accent + '10');
       mist.addColorStop(1, bg + '00');
       ctx.fillStyle = mist;
+      ctx.fillRect(-W * 0.1 + mistDrift * (i % 2 === 0 ? 1 : -1), layerY, W * 1.2, layerH);
+    }
+
+    ctx.fillStyle = accent + '22';
+    for (let i = 0; i < 36; i++) {
+      const px = ((i * 97.13 + t * (8 + (i % 5))) % (W + 40)) - 20;
+      const py = ((i * 53.71 + t * (4 + (i % 3))) % (H * 0.8)) + H * 0.08;
+      const r = 0.8 + (i % 3) * 0.6;
       ctx.beginPath();
-      ctx.arc(mx, my, mr, 0, Math.PI * 2);
+      ctx.arc(px, py, r, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    for (let i = 0; i < 40; i++) {
-      const px = ((i * 83.17) + t * (8 + (i % 5))) % W;
-      const py = ((i * 41.73) + t * (14 + (i % 3))) % H;
-      const s = 1 + (i % 3);
-      ctx.fillStyle = accent + '55';
-      ctx.beginPath();
-      ctx.arc(px, py, s, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    const shadowPulse = 1 + Math.sin(t * 0.9) * 0.08;
-    ctx.fillStyle = bg + '88';
+    const shadowAlpha = 0.18 + Math.sin(t * 0.7) * 0.03;
+    ctx.fillStyle = bg + '66';
+    ctx.globalAlpha = shadowAlpha;
     ctx.beginPath();
-    ctx.ellipse(vpX, H * 0.58, W * 0.045 * shadowPulse, H * 0.08 * shadowPulse, 0, 0, Math.PI * 2);
+    ctx.ellipse(vpX, H * 0.58, W * 0.035, H * 0.06, 0, 0, Math.PI * 2);
     ctx.fill();
+    ctx.globalAlpha = 1;
 
-    const distantGlow = ctx.createRadialGradient(vpX, H * 0.5, 0, vpX, H * 0.5, H * 0.18);
+    const distantGlow = ctx.createRadialGradient(vpX, H * 0.5, 0, vpX, H * 0.5, H * 0.12);
     distantGlow.addColorStop(0, accent + '12');
     distantGlow.addColorStop(1, accent + '00');
     ctx.fillStyle = distantGlow;
     ctx.beginPath();
-    ctx.arc(vpX, H * 0.5, H * 0.18, 0, Math.PI * 2);
+    ctx.arc(vpX, H * 0.5, H * 0.12, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.fillStyle = wall + 'cc';
+    ctx.fillStyle = bg + 'aa';
     ctx.beginPath();
     ctx.moveTo(vpX, H * 0.47);
-    ctx.quadraticCurveTo(vpX - W * 0.018, H * 0.52, vpX - W * 0.012, H * 0.58);
+    ctx.quadraticCurveTo(vpX - W * 0.018, H * 0.53, vpX - W * 0.012, H * 0.58);
     ctx.quadraticCurveTo(vpX, H * 0.6, vpX + W * 0.012, H * 0.58);
-    ctx.quadraticCurveTo(vpX + W * 0.018, H * 0.52, vpX, H * 0.47);
+    ctx.quadraticCurveTo(vpX + W * 0.018, H * 0.53, vpX, H * 0.47);
     ctx.fill();
 
-    const handY = H * 0.92 + Math.sin(t * 1.6) * 3;
-    const handGrad = ctx.createLinearGradient(vpX, handY - H * 0.08, vpX, H);
-    handGrad.addColorStop(0, accent + 'aa');
-    handGrad.addColorStop(1, wall);
-    ctx.fillStyle = handGrad;
+    ctx.fillStyle = accent + '14';
     ctx.beginPath();
-    ctx.moveTo(vpX - W * 0.05, H);
-    ctx.quadraticCurveTo(vpX - W * 0.04, handY - H * 0.03, vpX - W * 0.018, handY - H * 0.055);
-    ctx.lineTo(vpX + W * 0.018, handY - H * 0.055);
-    ctx.quadraticCurveTo(vpX + W * 0.04, handY - H * 0.03, vpX + W * 0.05, H);
+    ctx.arc(vpX, H * 0.49, W * 0.012, 0, Math.PI * 2);
+    ctx.fill();
+
+    const handY = H * 0.92 + Math.sin(t * 1.6) * 2;
+    ctx.fillStyle = wall;
+    ctx.beginPath();
+    ctx.moveTo(W * 0.44, H);
+    ctx.quadraticCurveTo(W * 0.455, handY - H * 0.04, W * 0.48, handY - H * 0.03);
+    ctx.lineTo(W * 0.52, handY - H * 0.03);
+    ctx.quadraticCurveTo(W * 0.545, handY - H * 0.04, W * 0.56, H);
     ctx.closePath();
     ctx.fill();
 
-    ctx.fillStyle = accent + 'cc';
+    ctx.fillStyle = accent + '88';
+    ctx.fillRect(W * 0.485, handY - H * 0.12, W * 0.03, H * 0.09);
+    ctx.fillStyle = accent;
     ctx.beginPath();
-    ctx.moveTo(vpX, handY - H * 0.11);
-    ctx.lineTo(vpX - W * 0.012, handY - H * 0.055);
-    ctx.lineTo(vpX + W * 0.012, handY - H * 0.055);
+    ctx.moveTo(W * 0.5, handY - H * 0.18);
+    ctx.lineTo(W * 0.485, handY - H * 0.11);
+    ctx.lineTo(W * 0.515, handY - H * 0.11);
     ctx.closePath();
     ctx.fill();
 
-    const vignette = ctx.createRadialGradient(vpX, H * 0.5, H * 0.2, vpX, H * 0.5, H * 0.8);
+    const vignette = ctx.createRadialGradient(vpX, H * 0.5, H * 0.2, vpX, H * 0.5, H * 0.75);
     vignette.addColorStop(0, bg + '00');
     vignette.addColorStop(1, bg + '77');
     ctx.fillStyle = vignette;
@@ -224,9 +243,16 @@ export default function TavernScene() {
       ctx.fillRect(0, 0, W, H);
     }
 
-    if (impact > 0) {
+    if (state === 'recoil' && impact > 0) {
       ctx.fillStyle = accent + '22';
-      ctx.fillRect(0, 0, W, H);
+      for (let i = 0; i < 12; i++) {
+        const ang = (i / 12) * Math.PI * 2;
+        const px = vpX + Math.cos(ang) * impact * W * 0.04;
+        const py = H * 0.58 + Math.sin(ang) * impact * H * 0.03;
+        ctx.beginPath();
+        ctx.arc(px, py, 2 + impact * 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
   }, [locationName]);
 

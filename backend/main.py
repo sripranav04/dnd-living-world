@@ -23,6 +23,7 @@ app.add_middleware(
 )
 
 _graph = None
+_active_sessions: set = set()  # guard against double session start
 
 
 @app.on_event("startup")
@@ -84,42 +85,61 @@ def stream_result(narrative: str, ui_instructions: list):
 @app.get("/game/session/start")
 async def session_start(session_id: str = Query(default="player_one")):
     print(f"[session_start] ENDPOINT HIT — session_id={session_id}")
+
     async def stream():
+        # ── Guard against double-fire ─────────────────────
+        if session_id in _active_sessions:
+            print(f"[session_start] duplicate request ignored for {session_id}")
+            yield sse({"type": "stream_end"})
+            return
+
+        _active_sessions.add(session_id)
         print(f"[session_start] called for session_id={session_id}")
         yield sse({"type": "stream_start"})
-        try:
-            loop = asyncio.get_event_loop()
 
-            # Run opening scene generation in thread (blocking LLM calls)
+        try:
+            loop   = asyncio.get_event_loop()
             result = await asyncio.wait_for(
                 loop.run_in_executor(
                     None, lambda: generate_opening(session_id)
                 ),
-                timeout=60.0  # 60s max for opening generation
+                timeout=120.0,
             )
 
             narrative       = result.get("narrative", "")
             ui_instructions = result.get("ui_instructions", [])
 
-            print(f"[session_start] opening ready — {len(ui_instructions)} instructions, narrative={len(narrative)} chars")
+            print(f"[session_start] opening ready — {len(ui_instructions)} instructions, "
+                  f"narrative={len(narrative)} chars")
 
             yield sse({"type": "session_type", "is_new": True})
             yield sse({"type": "turn_change",  "active_character": "vex"})
 
-            # Stream instructions first
             async for chunk in stream_result(narrative, ui_instructions):
                 yield chunk
 
             print(f"[session_start] stream complete")
 
         except asyncio.TimeoutError:
-            print(f"[session_start] timeout — using fallback")
-            yield sse({"type": "narrative_text", "speaker": "dm", "speaker_label": "Dungeon Master",
-                       "text": "Cold air presses down as your boots scrape over cracked flagstone. The vault ahead exhales a breath of old death. Your torches barely reach the walls. You grip your weapons and step forward."})
+            print(f"[session_start] timeout after 120s — using fallback narrative")
+            yield sse({
+                "type":          "narrative_text",
+                "speaker":       "dm",
+                "speaker_label": "Dungeon Master",
+                "text": (
+                    "Cold air presses down as your boots scrape over cracked flagstone. "
+                    "The vault ahead exhales a breath of old death — somewhere in the dark, "
+                    "something shifts. Your torches barely reach the walls. "
+                    "The silence has weight. You grip your weapons and step forward."
+                ),
+            })
         except Exception:
             tb = traceback.format_exc()
             print(f"[session_start] error:\n{tb}")
             yield sse({"type": "error", "message": tb})
+
+        finally:
+            _active_sessions.discard(session_id)
 
         yield sse({"type": "stream_end"})
 
@@ -131,6 +151,7 @@ async def session_start(session_id: str = Query(default="player_one")):
             "Connection":        "keep-alive",
         },
     )
+
 
 @app.get("/game/action")
 async def game_action(
@@ -165,9 +186,9 @@ async def game_action(
     return StreamingResponse(
         stream(), media_type="text/event-stream",
         headers={
-            "Cache-Control":    "no-cache",
-            "X-Accel-Buffering":"no",
-            "Connection":       "keep-alive",
+            "Cache-Control":     "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection":        "keep-alive",
         },
     )
 
@@ -175,5 +196,6 @@ async def game_action(
 @app.delete("/game/session/{session_id}")
 async def reset_session_endpoint(session_id: str):
     reset_graph_session(session_id)
+    _active_sessions.discard(session_id)  # clear lock on reset
     print(f"[reset_session] cleared session {session_id}")
     return {"status": "cleared", "session_id": session_id}

@@ -12,7 +12,6 @@ def _build_system_prompt(state: dict) -> str:
     encounter  = world.get("current_encounter", {})
     session_id = state.get("session_id", "")
 
-    # Use acting_character for the prompt — who is acting NOW
     acting_character = state.get("acting_character", "") or state.get("active_character", "")
 
     party_lines = []
@@ -87,31 +86,88 @@ PARTY (current state):
 LOCATION: {location}{combat_block}{turn_block}{lore_block}
 TONE: gothic horror, tense, cinematic, present tense, second person
 
-COMBAT NARRATION RULES — READ CAREFULLY:
+ACTION TYPE NARRATION — CRITICAL, READ CAREFULLY:
+You MUST match the narration style to what the player actually said they did.
+Read the PLAYER ACTION carefully BEFORE writing the narrative.
+
+- Player says "cast a spell" / "cast fireball" / "use magic" / "channel" / "arcane":
+  → Narrate MAGIC: arcane light, spell projectile, magical force, energy crackling.
+  → NEVER describe a sword swing or physical weapon strike.
+  → log_type = "spell"
+
+- Player says "attack" / "strike" / "hit" / "swing" / "stab" / "slash":
+  → Narrate PHYSICAL: weapon blow, blade connecting, shield bash.
+  → log_type = "attack"
+
+- Player says "dodge" / "fall back" / "defensive":
+  → Narrate EVASION: ducking, rolling, raising shield defensively.
+  → log_type = "move"
+
+- Player says "heal" / "second wind" / "cure wounds" / "revive":
+  → Narrate HEALING: warmth spreading, wounds closing, energy restoring.
+  → log_type = "heal"
+
+- Player says "investigate" / "look" / "search" / "examine":
+  → Narrate EXPLORATION: careful observation, noticing details.
+  → log_type = "move"
+
+The damage numbers from [MECHANICS RESOLVED] are always correct.
+Only the DELIVERY METHOD changes based on what the player said.
+Example: "Cast a spell" + damage 7 = magic bolt hits for 7, NOT sword swing for 7.
+
+COMBAT NARRATION RULES:
 When context contains [MECHANICS RESOLVED], you MUST:
 1. Accept every number as absolute truth — never re-roll, never invent damage values
-2. Narrate the outcome using ONLY the provided roll, damage, and HP numbers
+2. Narrate the outcome using the provided numbers BUT matching the player's action type above
 3. On CRITICAL HIT: make the narration visceral and dramatic
 4. On CRITICAL MISS: describe an appropriate fumble or mishap
-5. Always emit combat_log_entry with the exact numbers from the resolved block
-6. Always emit update_stats reflecting the exact remaining HP
+5. Always emit combat_log_entry with exact numbers from the resolved block
+6. Always emit update_stats reflecting exact remaining HP
+
+When context contains [ENEMY RETALIATION]:
+- Narrate BOTH the player's action AND the enemy's counter-attack in one narrative
+- The enemy attack is real — describe it happening to the named target
+- Emit update_stats for the target character who took damage
+
+When context contains [COMBAT END — VICTORY]:
+- Narrate a dramatic victory — the enemy falls, collapses, dissolves
+- Emit update_world with inCombat:false
+- Emit update_session with xp:150 and kills:1
+- Emit combat_log_entry describing the kill
+
+When context contains [COMBAT END — DEFEAT]:
+- Narrate a dramatic defeat — the party is overwhelmed
+- Emit update_world with inCombat:false
+
+When context contains [CHARACTER DOWNED]:
+- Mention the character falling in the narrative
+- Emit update_stats with isDowned:true for them
 
 STAT UPDATE RULES:
-- update_stats must use the EXACT character id from the party list above
-- Valid ids are ONLY: aldric, lyra, thane, vex — no other values are valid
+- update_stats must use the EXACT character id: aldric, lyra, thane, vex
 - Only update HP for the character who actually took damage
-- Enemy damage does NOT change party HP unless stated in [MECHANICS RESOLVED]
+- Enemy retaliation damage MUST be reflected in update_stats for the target
 
 CHARACTER PERSPECTIVE RULES:
-- The active character is NOW ACTING shown above
-- ALL narration must be from that character's perspective
-- NEVER narrate a different character acting than NOW ACTING
+- ALL narration must be from NOW ACTING character's perspective
 - The narrative "you" always refers to NOW ACTING character
+- NEVER narrate a different character acting
 
-When context does NOT contain [MECHANICS RESOLVED]:
-- If player provides a dice roll in brackets like [rolled 18 on d20], use that exact number
-- Apply D&D 5e rules for AC checks, damage, saving throws
-- Enemies retaliate each turn logically
+ENEMY HP TRACKING — REQUIRED every combat turn:
+Always emit update_world with enemy HP after each attack:
+{{"type": "update_world", "world": {{
+  "enemyName": "Shadow Wraith",
+  "enemyHp": 32,
+  "enemyMaxHp": 45
+}}}}
+
+When context contains [COMBAT END — VICTORY]:
+- Narrate a dramatic victory — the enemy falls, collapses, dissolves
+- ALWAYS emit ALL of these instructions:
+  1. {{"type": "update_world", "world": {{"inCombat": false, "enemyHp": 0}}}}
+  2. {{"type": "update_session", "stats": {{"xp": 150, "kills": 1}}}}
+  3. {{"type": "combat_log_entry", "text": "Victory! 150 XP earned.", "log_type": "system"}}
+- Do NOT forget update_session — kills and XP must always be recorded on victory
 
 log_type options: attack, spell, heal, move, system
 
@@ -125,7 +181,6 @@ def dm_node(state: dict) -> dict:
     turn_count        = state.get("turn_count", 0)
     session_summary   = state.get("session_summary", "")
 
-    # acting_character = who IS acting NOW (for narration)
     acting_character = state.get("acting_character", "") or state.get("active_character", "")
 
     context_entries = narrative_history[-6:] if len(narrative_history) > 6 else narrative_history
@@ -141,7 +196,12 @@ def dm_node(state: dict) -> dict:
     mechanics_context = ""
     for m in reversed(messages):
         if getattr(m, "type", None) == "system" and (
-            "[MECHANICS RESOLVED" in m.content or "[TURN ORDER]" in m.content
+            "[MECHANICS RESOLVED" in m.content or
+            "[TURN ORDER]" in m.content or
+            "[NON-COMBAT" in m.content or
+            "[ENEMY RETALIATION" in m.content or
+            "[COMBAT END" in m.content or
+            "[CHARACTER DOWNED" in m.content
         ):
             mechanics_context = m.content
             break
@@ -156,7 +216,6 @@ def dm_node(state: dict) -> dict:
     if mechanics_context:
         human_content = f"{mechanics_context}\n\n{human_content}"
 
-    # ── Debug ─────────────────────────────────────────────
     print(f"[dm] acting_character={acting_character} | turn_count={turn_count}")
     print(f"[dm] human_content preview: {human_content[:200]}")
 
@@ -184,9 +243,9 @@ def dm_node(state: dict) -> dict:
             parsed = {}
         if not parsed:
             parsed = {
-                "narrative": raw[:500] or "The dungeon falls silent.",
-                "ui_instructions": [],
-                "next_agent": "dm",
+                "narrative":        raw[:500] or "The dungeon falls silent.",
+                "ui_instructions":  [],
+                "next_agent":       "dm",
             }
 
     narrative       = parsed.get("narrative", "")
