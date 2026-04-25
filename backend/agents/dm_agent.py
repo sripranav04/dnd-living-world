@@ -216,9 +216,6 @@ def dm_node(state: dict) -> dict:
     if mechanics_context:
         human_content = f"{mechanics_context}\n\n{human_content}"
 
-    print(f"[dm] acting_character={acting_character} | turn_count={turn_count}")
-    print(f"[dm] human_content preview: {human_content[:200]}")
-
     prompt_messages = [
         SystemMessage(content=_build_system_prompt(state)),
         HumanMessage(content=human_content),
@@ -266,7 +263,48 @@ def dm_node(state: dict) -> dict:
         ])
         new_summary = (new_summary + " " + summary_resp.content.strip()).strip()
 
+    # ----------------------------------------------------------------
+    # FIX: apply ui_instructions into world so vibe_architect_node
+    # receives the correct enemy name within the same graph turn.
+    # Without this, vibe_architect reads the stale session-start enemy.
+    # ----------------------------------------------------------------
+    current_world = state.get("world", {})
+    updated_world = {**current_world}
+    updated_encounter = {**updated_world.get("current_encounter", {})}
+
+    for inst in ui_instructions:
+        itype = inst.get("type", "")
+
+        if itype == "update_theme":
+            new_theme = inst.get("theme", "")
+            if new_theme:
+                updated_world["theme"] = new_theme
+                print(f"[dm] world patch — theme → {new_theme}")
+
+        elif itype == "update_world":
+            patch = inst.get("world", {})
+
+            # enemy identity (DM uses camelCase enemyName)
+            enemy_name = patch.get("enemyName") or patch.get("enemy_name")
+            if enemy_name:
+                updated_encounter["enemy_name"] = enemy_name
+                print(f"[dm] world patch — enemy_name → {enemy_name}")
+
+            if "enemyHp" in patch:
+                updated_encounter["enemy_hp"] = patch["enemyHp"]
+            if "enemyMaxHp" in patch:
+                updated_encounter["enemy_max_hp"] = patch["enemyMaxHp"]
+            if "inCombat" in patch:
+                updated_world["inCombat"] = patch["inCombat"]
+                print(f"[dm] world patch — inCombat → {patch['inCombat']}")
+            if "locationName" in patch:
+                updated_world["locationName"] = patch["locationName"]
+                print(f"[dm] world patch — locationName → {patch['locationName']}")
+
+    updated_world["current_encounter"] = updated_encounter
+
     return {
+        "world":             updated_world,
         "ui_queue":          ui_instructions,
         "narrative_history": new_history,
         "turn_count":        turn_count + 1,

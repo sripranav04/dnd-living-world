@@ -1,3 +1,4 @@
+import re
 import random
 from mechanics.dice import resolve_attack
 from mechanics.open5e import fetch_monster_sync
@@ -19,6 +20,31 @@ def _get_enemy_stats(enemy_name: str) -> dict:
     )
 
 
+def _extract_player_roll(action_text: str) -> int | None:
+    """
+    Parse a player-supplied dice roll from the action text.
+    Accepts formats:
+      [rolled 18 on d20]
+      [rolled 18]
+      (rolled 18)
+      roll: 18
+    Returns the integer roll value, or None if not found.
+    """
+    patterns = [
+        r"\[rolled\s+(\d+)(?:\s+on\s+d\d+)?\]",   # [rolled 18 on d20] or [rolled 18]
+        r"\(rolled\s+(\d+)(?:\s+on\s+d\d+)?\)",   # (rolled 18 on d20)
+        r"roll(?:ed)?[:\s]+(\d+)",                  # roll: 18  or  rolled 18
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, action_text, re.IGNORECASE)
+        if match:
+            val = int(match.group(1))
+            if 1 <= val <= 20:                      # sanity check — must be valid d20
+                print(f"[mechanics] player-supplied roll detected: {val}")
+                return val
+    return None
+
+
 def _check_combat_end(encounter: dict, party: dict) -> str | None:
     """Returns combat end status or None if combat continues."""
     if encounter.get("enemy_hp", 1) <= 0:
@@ -29,7 +55,7 @@ def _check_combat_end(encounter: dict, party: dict) -> str | None:
 
 
 def _resolve_enemy_attack(encounter: dict, party: dict) -> str | None:
-    """Resolve enemy counter-attack. Returns narrative line or None."""
+    """Resolve enemy counter-attack against a random living party member."""
     enemy_name = encounter.get("enemy_name", "Enemy")
     enemy_hp   = encounter.get("enemy_hp", 0)
 
@@ -171,10 +197,14 @@ def mechanics_node(state: AgentState) -> dict:
     damage_expr  = active_char.get("damage_expression") or "1d6+2"
     target_ac    = encounter.get("target_ac") or 13
 
+    # Check if the player supplied their own d20 roll
+    player_roll = _extract_player_roll(last_message)
+
     resolution = resolve_attack(
         attack_bonus=attack_bonus,
         target_ac=target_ac,
         damage_expression=damage_expr,
+        player_d20=player_roll,          # None = roll randomly as before
     )
 
     enemy_hp_remaining = None
@@ -195,33 +225,35 @@ def mechanics_node(state: AgentState) -> dict:
     parts = [
         "[MECHANICS RESOLVED — do NOT re-roll or invent numbers]",
         mechanics_summary,
+        # Remind DM to always emit combat_log_entry
+        "\nREQUIRED: You MUST emit a combat_log_entry instruction with the exact hit/damage numbers above.",
     ]
 
     if enemy_retaliation:
         parts.append(f"\n[ENEMY RETALIATION — narrate this too]\n{enemy_retaliation}")
 
-        if combat_status == "enemy_defeated":
-         parts.append(
+    if combat_status == "enemy_defeated":
+        parts.append(
             "\n[COMBAT END — VICTORY] The enemy has been defeated. "
             "Narrate a dramatic victory. "
-            "You MUST emit: update_world with inCombat:false, "
-            "update_session with xp:150 and kills:1, "
-            "combat_log_entry describing the kill."
+            "You MUST emit ALL THREE: "
+            "1) update_world with inCombat:false and enemyHp:0, "
+            "2) update_session with xp:150 and kills:1, "
+            "3) combat_log_entry describing the kill."
         )
         world["inCombat"] = False
-        # Also directly add update_session to ui_queue so it can't be missed
         state.setdefault("ui_queue", []).append({
             "type": "update_session",
             "stats": {"xp": 150, "kills": 1}
         })
         print(f"[combat] VICTORY — {encounter.get('enemy_name')} defeated")
     elif combat_status == "party_wiped":
-            parts.append(
-                "\n[COMBAT END — DEFEAT] All party members are downed. "
-                "Narrate a dramatic defeat. Emit update_world with inCombat:false."
-            )
-            world["inCombat"] = False
-            print(f"[combat] DEFEAT — party wiped")
+        parts.append(
+            "\n[COMBAT END — DEFEAT] All party members are downed. "
+            "Narrate a dramatic defeat. Emit update_world with inCombat:false."
+        )
+        world["inCombat"] = False
+        print(f"[combat] DEFEAT — party wiped")
 
     # ── Check individual downed characters ────────────────
     newly_downed = [
@@ -255,9 +287,10 @@ def _format_for_narrator(r: dict, attacker: str, enemy_hp_remaining: int = None)
     if r["hit"]:
         hp_line = (f" Enemy HP remaining: {enemy_hp_remaining}."
                    if enemy_hp_remaining is not None else "")
+        player_roll_note = " [player-supplied roll]" if r.get("player_supplied_roll") else ""
         return (
             f"{attacker} rolled {r['attack_roll']} to hit "
-            f"(dice: {r['attack_dice']}, modifier: +{r['attack_modifier']}) "
+            f"(dice: {r['attack_dice']}, modifier: +{r['attack_modifier']}){player_roll_note} "
             f"vs AC {r['target_ac']}{crit_tag}. "
             f"HIT. Damage: {r['damage']} ({r['damage_expression']}, "
             f"rolls: {r['damage_rolls']}).{hp_line}"
