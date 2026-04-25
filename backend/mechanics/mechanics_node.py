@@ -106,12 +106,26 @@ def mechanics_node(state: AgentState) -> dict:
     party        = state.get("party", {})
     encounter    = world.get("current_encounter", {})
 
-    if not world.get("inCombat"):
-        return {"next_agent": "dm"}
-
     action_lower = last_message.lower()
     is_attack    = any(w in action_lower for w in
                        ["attack", "strike", "hit", "swing", "shoot", "cast", "spell"])
+
+  # If not in combat and not an attack — pass straight to DM, nothing to resolve
+    if not world.get("inCombat") and not is_attack:
+        return {"next_agent": "dm"}
+
+    # If not in combat but player is attacking — only start combat if enemy is alive
+    if not world.get("inCombat") and is_attack:
+        if encounter.get("enemy_hp", 0) > 0:
+            world["inCombat"] = True
+            if not encounter.get("current_turn"):
+                encounter["current_turn"] = encounter.get("initiative_order", ["vex"])[0]
+            world["current_encounter"] = encounter
+            print(f"[mechanics] combat initiated by player action")
+        else:
+            # No living enemy — treat as narrative action, let DM continue the story
+            print(f"[mechanics] attack with no living enemy — passing to DM as narrative")
+            return {"next_agent": "dm"}
 
     # ── Turn order validation ─────────────────────────────
     initiative_order = encounter.get("initiative_order", [])
@@ -233,20 +247,27 @@ def mechanics_node(state: AgentState) -> dict:
         parts.append(f"\n[ENEMY RETALIATION — narrate this too]\n{enemy_retaliation}")
 
     if combat_status == "enemy_defeated":
-        parts.append(
-            "\n[COMBAT END — VICTORY] The enemy has been defeated. "
-            "Narrate a dramatic victory. "
-            "You MUST emit ALL THREE: "
-            "1) update_world with inCombat:false and enemyHp:0, "
-            "2) update_session with xp:150 and kills:1, "
-            "3) combat_log_entry describing the kill."
-        )
-        world["inCombat"] = False
-        state.setdefault("ui_queue", []).append({
-            "type": "update_session",
-            "stats": {"xp": 150, "kills": 1}
-        })
-        print(f"[combat] VICTORY — {encounter.get('enemy_name')} defeated")
+            parts.append(
+                "\n[COMBAT END — VICTORY] The enemy has been defeated. "
+                "Narrate the kill in 1-2 sentences, then IMMEDIATELY introduce the next "
+                "story beat — a sound from deeper in, a shadow moving, a door swinging open, "
+                "something discovered on the body. The world keeps moving. "
+                "Do NOT wrap up the session or imply the adventure is over. "
+                "You MUST emit ALL THREE: "
+                "1) update_world with inCombat:false and enemyHp:0, "
+                "2) update_session with xp:150 and kills:1, "
+                "3) combat_log_entry describing the kill."
+            )
+            world["inCombat"] = False
+            # Reset encounter so next combat starts fresh
+            encounter["enemy_hp"]    = 0
+            encounter["stats_loaded"] = False
+            world["current_encounter"] = encounter
+            state.setdefault("ui_queue", []).append({
+                "type": "update_session",
+                "stats": {"xp": 150, "kills": 1}
+            })
+            print(f"[combat] VICTORY — {encounter.get('enemy_name')} defeated")
     elif combat_status == "party_wiped":
         parts.append(
             "\n[COMBAT END — DEFEAT] All party members are downed. "

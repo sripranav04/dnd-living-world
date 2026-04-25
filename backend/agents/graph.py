@@ -17,7 +17,7 @@ MONSTER_ROSTER = [
     {"name": "Zombie",          "hp": 22, "ac": 8,  "attack_bonus": 3, "damage": "1d6+1"},
 ]
 
-PARTY_ROSTER= {
+PARTY_ROSTER = {
     "aldric": {"name": "Aldric", "hp": 54, "max_hp": 54, "ac": 18, "attack_bonus": 7, "damage_expression": "1d8+4"},
     "lyra":   {"name": "Lyra",   "hp": 35, "max_hp": 35, "ac": 13, "attack_bonus": 6, "damage_expression": "1d6+3"},
     "thane":  {"name": "Thane",  "hp": 45, "max_hp": 45, "ac": 16, "attack_bonus": 5, "damage_expression": "1d8+3"},
@@ -25,12 +25,12 @@ PARTY_ROSTER= {
 }
 
 
-def _fresh_world(monster: dict) -> dict:
+def _fresh_world(monster: dict, theme: str = "dark-gothic", location: str = "The Vault of Shadows") -> dict:
     return {
-        "inCombat": True,
-        "locationName": "The Vault of Shadows",
-        "biome": "dungeon",
-        "theme": "dark-gothic",
+        "inCombat":    False,
+        "locationName": location,
+        "biome":       "dungeon",
+        "theme":       theme,
         "current_encounter": {
             "enemy_name":       monster["name"],
             "enemy_hp":         monster["hp"],
@@ -63,7 +63,8 @@ async def build_graph():
     return builder.compile()
 
 
-def _fresh_state(session_id: str, monster: dict | None = None) -> dict:
+def _fresh_state(session_id: str, monster: dict | None = None,
+                 theme: str = "dark-gothic", location: str = "The Vault of Shadows") -> dict:
     import copy
     if monster is None:
         monster = random.choice(MONSTER_ROSTER)
@@ -72,7 +73,7 @@ def _fresh_state(session_id: str, monster: dict | None = None) -> dict:
         "active_character":  "vex",
         "acting_character":  "vex",
         "party":             copy.deepcopy(PARTY_ROSTER),
-        "world":             _fresh_world(monster),
+        "world":             _fresh_world(monster, theme=theme, location=location),
         "ui_queue":          [],
         "narrative_history": [],
         "turn_count":        0,
@@ -83,7 +84,6 @@ def _fresh_state(session_id: str, monster: dict | None = None) -> dict:
 
 
 def _apply_monster_from_name(state: dict, enemy_name: str) -> None:
-    """Find monster in roster by name and apply to encounter state."""
     monster = next(
         (m for m in MONSTER_ROSTER if m["name"].lower() == enemy_name.lower()),
         None
@@ -97,7 +97,6 @@ def _apply_monster_from_name(state: dict, enemy_name: str) -> None:
         })
         print(f"[graph] monster set → {monster['name']} (HP {monster['hp']}, AC {monster['ac']})")
     else:
-        # Unknown monster — just set the name, keep existing stats
         state["world"]["current_encounter"]["enemy_name"] = enemy_name
         print(f"[graph] unknown monster '{enemy_name}' — name set, stats unchanged")
 
@@ -108,7 +107,10 @@ async def run_turn(
     session_id: str,
     active_character: str = "",
 ) -> dict:
+    # State should always be initialised by set_session_monster before first turn.
+    # This is a safety fallback only.
     if session_id not in _session_states:
+        print(f"[graph] WARNING: run_turn called before set_session_monster — creating fallback state")
         _session_states[session_id] = _fresh_state(session_id)
 
     state = _session_states[session_id]
@@ -143,7 +145,6 @@ async def run_turn(
                 all_updates.update(updates)
                 state.update(updates)
 
-    # Apply all UI instructions back into persistent session state
     for instruction in all_updates.get("ui_queue", []):
         itype = instruction.get("type", "")
 
@@ -190,14 +191,43 @@ async def run_turn(
     }
 
 
-def set_session_monster(session_id: str, enemy_name: str) -> None:
-    """Called by opening_scene to set the monster after DM picks one."""
-    if session_id not in _session_states:
-        return
-    _apply_monster_from_name(_session_states[session_id], enemy_name)
+def set_session_monster(
+    session_id: str,
+    enemy_name: str,
+    theme: str = "dark-gothic",
+    location: str = "The Vault of Shadows",
+) -> None:
+    """
+    Called by opening_scene after generating the opening.
+    Creates fresh in-memory state with correct monster, theme and location.
+    Wipes MongoDB so no stale data bleeds in from previous sessions.
+    """
+    from memory.lore import clear_session
+
+    # Always wipe and recreate — canonical session start point
+    if session_id in _session_states:
+        del _session_states[session_id]
+
+    clear_session(session_id)
+
+    monster = next(
+        (m for m in MONSTER_ROSTER if m["name"].lower() == enemy_name.lower()),
+        MONSTER_ROSTER[0],
+    )
+
+    _session_states[session_id] = _fresh_state(
+        session_id,
+        monster=monster,
+        theme=theme,
+        location=location,
+    )
+    print(f"[graph] session initialised — monster={monster['name']} theme={theme} location={location}")
 
 
 def reset_session(session_id: str) -> None:
+    """Full reset — clears in-memory state AND MongoDB for this session."""
+    from memory.lore import clear_session
     if session_id in _session_states:
         del _session_states[session_id]
-        print(f"[graph] session {session_id} cleared")
+    clear_session(session_id)
+    print(f"[graph] session {session_id} fully reset")

@@ -99,12 +99,21 @@ def _parse_response(raw: str, fallback: dict) -> dict:
     return fallback
 
 
-def _extract_enemy_name(result: dict) -> str | None:
-    """Pull enemy_name out of update_world instruction."""
+def _extract_opening_context(result: dict) -> tuple[str, str, str]:
+    """Extract enemy_name, theme, and locationName from opening instructions."""
+    enemy_name = "Shadow Wraith"
+    theme      = "dark-gothic"
+    location   = "The Vault of Shadows"
+
     for instr in result.get("ui_instructions", []):
-        if instr.get("type") == "update_world":
-            return instr.get("world", {}).get("enemy_name")
-    return None
+        if instr.get("type") == "update_theme":
+            theme = instr.get("theme", theme)
+        elif instr.get("type") == "update_world":
+            w          = instr.get("world", {})
+            enemy_name = w.get("enemy_name", enemy_name)
+            location   = w.get("locationName", location)
+
+    return enemy_name, theme, location
 
 
 def _generate_opening_scene(result: dict) -> str:
@@ -112,18 +121,11 @@ def _generate_opening_scene(result: dict) -> str:
     try:
         from agents.vibe_architect import generate_scene_component, validate_and_write_component
 
-        instructions = result.get("ui_instructions", [])
-        theme     = "dark-gothic"
-        location  = "Unknown"
+        _, theme, location = _extract_opening_context(result)
         in_combat = False
-
-        for instr in instructions:
-            if instr.get("type") == "update_theme":
-                theme = instr.get("theme", theme)
-            elif instr.get("type") == "update_world":
-                w = instr.get("world", {})
-                location  = w.get("locationName", location)
-                in_combat = w.get("inCombat", False)
+        for instr in result.get("ui_instructions", []):
+            if instr.get("type") == "update_world":
+                in_combat = instr.get("world", {}).get("inCombat", False)
 
         theme_to_scene = {
             "dark-gothic":   "DungeonScene",
@@ -175,22 +177,15 @@ def generate_new_session() -> dict:
         ])
         result = _parse_response(resp.content, FALLBACK_NEW)
 
-        # Log location
-        instructions = result.get("ui_instructions", [])
-        loc = next(
-            (i.get("world", {}).get("locationName", "?")
-             for i in instructions if i.get("type") == "update_world"),
-            "?"
-        )
-        enemy = _extract_enemy_name(result) or "unknown"
-        print(f"[opening_scene] new session: {loc} | monster: {enemy}")
+        enemy_name, theme, location = _extract_opening_context(result)
+        print(f"[opening_scene] new session: {location} | monster: {enemy_name}")
 
-        # Apply monster to session state
+        # Initialise in-memory state + wipe MongoDB with all three values
         try:
             from agents.graph import set_session_monster
-            set_session_monster("player_one", enemy)
+            set_session_monster("player_one", enemy_name, theme=theme, location=location)
         except Exception as e:
-            print(f"[opening_scene] monster apply warning: {e}")
+            print(f"[opening_scene] session init warning: {e}")
 
         # Generate opening visual
         scene_name = _generate_opening_scene(result)

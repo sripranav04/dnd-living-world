@@ -3,7 +3,7 @@ import re
 
 from llm_provider import get_llm
 from langchain_core.messages import SystemMessage, HumanMessage
-from memory.lore import load_facts, format_facts_for_prompt
+from memory.lore import load_facts, format_facts_for_prompt, save_combat_log
 
 
 def _build_system_prompt(state: dict) -> str:
@@ -88,7 +88,6 @@ TONE: gothic horror, tense, cinematic, present tense, second person
 
 ACTION TYPE NARRATION — CRITICAL, READ CAREFULLY:
 You MUST match the narration style to what the player actually said they did.
-Read the PLAYER ACTION carefully BEFORE writing the narrative.
 
 - Player says "cast a spell" / "cast fireball" / "use magic" / "channel" / "arcane":
   → Narrate MAGIC: arcane light, spell projectile, magical force, energy crackling.
@@ -111,14 +110,10 @@ Read the PLAYER ACTION carefully BEFORE writing the narrative.
   → Narrate EXPLORATION: careful observation, noticing details.
   → log_type = "move"
 
-The damage numbers from [MECHANICS RESOLVED] are always correct.
-Only the DELIVERY METHOD changes based on what the player said.
-Example: "Cast a spell" + damage 7 = magic bolt hits for 7, NOT sword swing for 7.
-
 COMBAT NARRATION RULES:
 When context contains [MECHANICS RESOLVED], you MUST:
 1. Accept every number as absolute truth — never re-roll, never invent damage values
-2. Narrate the outcome using the provided numbers BUT matching the player's action type above
+2. Narrate the outcome matching the player's action type above
 3. On CRITICAL HIT: make the narration visceral and dramatic
 4. On CRITICAL MISS: describe an appropriate fumble or mishap
 5. Always emit combat_log_entry with exact numbers from the resolved block
@@ -126,51 +121,37 @@ When context contains [MECHANICS RESOLVED], you MUST:
 
 When context contains [ENEMY RETALIATION]:
 - Narrate BOTH the player's action AND the enemy's counter-attack in one narrative
-- The enemy attack is real — describe it happening to the named target
 - Emit update_stats for the target character who took damage
 
 When context contains [COMBAT END — VICTORY]:
-- Narrate a dramatic victory — the enemy falls, collapses, dissolves
-- Emit update_world with inCombat:false
-- Emit update_session with xp:150 and kills:1
-- Emit combat_log_entry describing the kill
-
-When context contains [COMBAT END — DEFEAT]:
-- Narrate a dramatic defeat — the party is overwhelmed
-- Emit update_world with inCombat:false
-
-When context contains [CHARACTER DOWNED]:
-- Mention the character falling in the narrative
-- Emit update_stats with isDowned:true for them
-
-STAT UPDATE RULES:
-- update_stats must use the EXACT character id: aldric, lyra, thane, vex
-- Only update HP for the character who actually took damage
-- Enemy retaliation damage MUST be reflected in update_stats for the target
-
-CHARACTER PERSPECTIVE RULES:
-- ALL narration must be from NOW ACTING character's perspective
-- The narrative "you" always refers to NOW ACTING character
-- NEVER narrate a different character acting
-
-ENEMY HP TRACKING — REQUIRED every combat turn:
-Always emit update_world with enemy HP after each attack:
-{{"type": "update_world", "world": {{
-  "enemyName": "Shadow Wraith",
-  "enemyHp": 32,
-  "enemyMaxHp": 45
-}}}}
-
-When context contains [COMBAT END — VICTORY]:
-- Narrate a dramatic victory — the enemy falls, collapses, dissolves
-- ALWAYS emit ALL of these instructions:
+- ALWAYS emit ALL THREE:
   1. {{"type": "update_world", "world": {{"inCombat": false, "enemyHp": 0}}}}
   2. {{"type": "update_session", "stats": {{"xp": 150, "kills": 1}}}}
   3. {{"type": "combat_log_entry", "text": "Victory! 150 XP earned.", "log_type": "system"}}
-- Do NOT forget update_session — kills and XP must always be recorded on victory
+After victory: narrate the aftermath in 1-2 sentences, then immediately 
+introduce the next story hook — a sound, a shadow, a door, a clue. 
+The world does not stop. inCombat becomes false but the session continues.
+Do NOT wrap up the session or imply the adventure is over.
+
+When context contains [COMBAT END — DEFEAT]:
+- Narrate a dramatic defeat. Emit update_world with inCombat:false.
+
+When context contains [CHARACTER DOWNED]:
+- Emit update_stats with isDowned:true for them.
+
+STAT UPDATE RULES:
+- update_stats must use EXACT character id: aldric, lyra, thane, vex
+- Enemy retaliation damage MUST be reflected in update_stats for the target
+
+ENEMY HP TRACKING — REQUIRED every combat turn:
+Always emit update_world with enemy HP:
+{{"type": "update_world", "world": {{"enemyName": "<exact name>", "enemyHp": <hp>, "enemyMaxHp": <max>}}}}
+
+COMBAT LOG — MANDATORY ON EVERY COMBAT TURN:
+You MUST emit a combat_log_entry on every single combat turn.
+Include: who attacked, roll, hit/miss, damage, enemy HP remaining.
 
 log_type options: attack, spell, heal, move, system
-
 CRITICAL: Return ONLY the JSON object. No text before or after it."""
 
 
@@ -180,6 +161,7 @@ def dm_node(state: dict) -> dict:
     narrative_history = state.get("narrative_history", [])
     turn_count        = state.get("turn_count", 0)
     session_summary   = state.get("session_summary", "")
+    session_id        = state.get("session_id", "unknown")
 
     acting_character = state.get("acting_character", "") or state.get("active_character", "")
 
@@ -263,33 +245,24 @@ def dm_node(state: dict) -> dict:
         ])
         new_summary = (new_summary + " " + summary_resp.content.strip()).strip()
 
-    # ----------------------------------------------------------------
-    # FIX: apply ui_instructions into world so vibe_architect_node
-    # receives the correct enemy name within the same graph turn.
-    # Without this, vibe_architect reads the stale session-start enemy.
-    # ----------------------------------------------------------------
-    current_world = state.get("world", {})
-    updated_world = {**current_world}
+    # ── Apply ui_instructions into world so vibe_architect sees correct state ──
+    current_world     = state.get("world", {})
+    updated_world     = {**current_world}
     updated_encounter = {**updated_world.get("current_encounter", {})}
 
     for inst in ui_instructions:
         itype = inst.get("type", "")
-
         if itype == "update_theme":
             new_theme = inst.get("theme", "")
             if new_theme:
                 updated_world["theme"] = new_theme
                 print(f"[dm] world patch — theme → {new_theme}")
-
         elif itype == "update_world":
             patch = inst.get("world", {})
-
-            # enemy identity (DM uses camelCase enemyName)
             enemy_name = patch.get("enemyName") or patch.get("enemy_name")
             if enemy_name:
                 updated_encounter["enemy_name"] = enemy_name
                 print(f"[dm] world patch — enemy_name → {enemy_name}")
-
             if "enemyHp" in patch:
                 updated_encounter["enemy_hp"] = patch["enemyHp"]
             if "enemyMaxHp" in patch:
@@ -302,6 +275,40 @@ def dm_node(state: dict) -> dict:
                 print(f"[dm] world patch — locationName → {patch['locationName']}")
 
     updated_world["current_encounter"] = updated_encounter
+
+    # ── Save combat log to MongoDB ────────────────────────
+    encounter = state.get("world", {}).get("current_encounter", {})
+
+    mechanics_data = {}
+    if mechanics_context and "[MECHANICS RESOLVED" in mechanics_context:
+        mechanics_data["raw"] = mechanics_context[:500]
+
+    retaliation_line = None
+    if mechanics_context and "[ENEMY RETALIATION" in mechanics_context:
+        match = re.search(r"\[ENEMY RETALIATION[^\]]*\](.*)", mechanics_context, re.DOTALL)
+        if match:
+            retaliation_line = match.group(1).strip()[:300]
+
+    combat_end = None
+    if "[COMBAT END — VICTORY]" in mechanics_context:
+        combat_end = "victory"
+    elif "[COMBAT END — DEFEAT]" in mechanics_context:
+        combat_end = "defeat"
+
+    try:
+        save_combat_log(
+            session_id        = session_id,
+            turn              = turn_count,
+            round_num         = encounter.get("round_number", 1),
+            acting_character  = acting_character,
+            player_action     = player_action,
+            narrative         = narrative,
+            mechanics         = mechanics_data,
+            enemy_retaliation = retaliation_line,
+            combat_end        = combat_end,
+        )
+    except Exception as e:
+        print(f"[dm] combat log save failed ({e})")
 
     return {
         "world":             updated_world,
