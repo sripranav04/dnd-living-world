@@ -1,0 +1,25 @@
+# Python
+backend/.venv
+backend/__pycache__
+backend/**/__pycache__
+backend/**/*.pyc
+backend/dynamic_components
+
+# Node
+frontend/node_modules
+frontend/dist
+
+# Git
+.git
+.claude
+.vscode
+
+# Local env files
+.env.example
+
+# Docker files in subdirectories (we use root Dockerfile only)
+backend/Dockerfile
+frontend/Dockerfile
+
+# Logs
+*.log
