@@ -151,6 +151,10 @@ COMBAT LOG — MANDATORY ON EVERY COMBAT TURN:
 You MUST emit a combat_log_entry on every single combat turn.
 Include: who attacked, roll, hit/miss, damage, enemy HP remaining.
 
+CRITICAL: When [COMBAT END — VICTORY] has occurred this turn, do NOT 
+emit update_world with inCombat:true or introduce a new enemy_name. 
+The party decides when to engage the next threat
+
 log_type options: attack, spell, heal, move, system
 CRITICAL: Return ONLY the JSON object. No text before or after it."""
 
