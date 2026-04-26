@@ -14,7 +14,7 @@ const COMPONENT_MAP: Record<string, React.LazyExoticComponent<React.ComponentTyp
   NarrativeCard:      lazy(() => import('./dynamic/NarrativeCard')),
   EnvironmentBanner:  lazy(() => import('./dynamic/EnvironmentBanner')),
   CombatHUD:          lazy(() => import('./dynamic/CombatHUD')),
-  LootDisplay:        lazy(() => import('./dynamic/LootDisplay')),
+  // LootDisplay:        lazy(() => import('./dynamic/LootDisplay')),
   SpellEffect:        lazy(() => import('./dynamic/SpellEffect')),
 };
 

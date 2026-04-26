@@ -44,10 +44,12 @@ function Modal({ title, onClose, children }: {
 }
 
 export function TopBar({ onNewCampaign }: TopBarProps) {
-  const theme   = useGameStore((s) => s.theme);
-  const setTheme = useGameStore((s) => s.setTheme);
+  const theme          = useGameStore((s) => s.theme);
+  const setTheme       = useGameStore((s) => s.setTheme);
   const narrativeHistory = useGameStore((s) => s.narrativeHistory);
-  const party   = useGameStore((s) => s.party);
+  const party          = useGameStore((s) => s.party);
+  const inCombat       = useGameStore((s) => s.world.inCombat);
+  const isStreaming    = useGameStore((s) => s.isStreaming);
 
   const [modal, setModal] = useState<'journal' | 'inventory' | 'spells' | null>(null);
 
@@ -60,18 +62,51 @@ export function TopBar({ onNewCampaign }: TopBarProps) {
   return (
     <>
       <header className={styles.root}>
+        {/* ── Left — title + session tag ── */}
         <div className={styles.left}>
           <span className={styles.gameTitle}>⚔ Living World</span>
           <span className={styles.sessionTag}>SESSION_001 · PLAYER_ONE</span>
         </div>
 
+        {/* ── Center — DM status + combat pill ── */}
         <div className={styles.center}>
+          {/* DM online/offline indicator */}
           <span className={styles.liveTag}>
-            <span className={styles.liveDot} />
-            THE MASTER OF THE DUNGEONS IS HERE
+            <span
+              className={styles.liveDot}
+              style={{ background: isStreaming ? '#f5a623' : '#4caf50' }}
+            />
+            {isStreaming ? 'DM IS THINKING...' : 'THE MASTER OF THE DUNGEONS IS HERE'}
           </span>
+
+          {/* Combat active pill — only shown during combat */}
+          {inCombat && (
+            <span style={{
+              marginLeft: 14,
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+              padding: '2px 10px',
+              background: 'rgba(200,48,48,0.15)',
+              border: '0.5px solid rgba(200,48,48,0.5)',
+              borderRadius: 3,
+              fontFamily: 'var(--font-mono)',
+              fontSize: 9,
+              letterSpacing: '0.18em',
+              color: '#e07070',
+              textTransform: 'uppercase' as const,
+            }}>
+              <span style={{
+                width: 5, height: 5, borderRadius: '50%',
+                background: '#e05050',
+                boxShadow: '0 0 6px #e05050',
+                animation: 'pulse 1.4s ease-in-out infinite',
+                flexShrink: 0,
+              }} />
+              COMBAT ACTIVE
+            </span>
+          )}
         </div>
 
+        {/* ── Right — action buttons ── */}
         <div className={styles.right}>
           <button
             className={`${styles.topBtn} ${styles.newCampaignBtn}`}
