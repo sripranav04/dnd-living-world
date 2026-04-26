@@ -188,7 +188,11 @@ const DEFAULT_WORLD: WorldState = {
   description: "A collapsed necromancer's treasury. Bones and scattered coin. The ceiling breathes.",
   conditions: ['Darkness', 'Difficult Terrain', 'Unhallowed'],
   round: 3,
-  inCombat: true,
+  inCombat: false,
+  enemyName: '',
+  enemyHp: 0,
+  enemyMaxHp: 0,
+
 };
 
 const DEFAULT_TOKENS: TokenPosition[] = [
@@ -338,8 +342,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   if (patch.inCombat === false && wasInCombat) {
     store.mountComponent('map-overlay', null);
     store.setWorld({ enemyName: '', enemyHp: 0, enemyMaxHp: 0 });
-    store.mountComponent('narrative-extra', 'LootDisplay');
-    setTimeout(() => store.mountComponent('narrative-extra', null), 10000);
+    // store.mountComponent('narrative-extra', 'LootDisplay');
+    // setTimeout(() => store.mountComponent('narrative-extra', null), 10000);
   }
   break;
 }

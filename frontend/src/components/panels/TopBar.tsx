@@ -49,7 +49,7 @@ export function TopBar({ onNewCampaign }: TopBarProps) {
   const narrativeHistory = useGameStore((s) => s.narrativeHistory);
   const party          = useGameStore((s) => s.party);
   const inCombat       = useGameStore((s) => s.world.inCombat);
-  const isStreaming    = useGameStore((s) => s.isStreaming);
+  const isDmTyping    = useGameStore((s) => s.isDmTyping);
 
   const [modal, setModal] = useState<'journal' | 'inventory' | 'spells' | null>(null);
 
@@ -74,9 +74,9 @@ export function TopBar({ onNewCampaign }: TopBarProps) {
           <span className={styles.liveTag}>
             <span
               className={styles.liveDot}
-              style={{ background: isStreaming ? '#f5a623' : '#4caf50' }}
+              style={{ background: isDmTyping ? '#f5a623' : '#4caf50' }}
             />
-            {isStreaming ? 'DM IS THINKING...' : 'THE MASTER OF THE DUNGEONS IS HERE'}
+            {isDmTyping ? 'DM IS THINKING...' : 'THE MASTER OF THE DUNGEONS IS HERE'}
           </span>
 
           {/* Combat active pill — only shown during combat */}
