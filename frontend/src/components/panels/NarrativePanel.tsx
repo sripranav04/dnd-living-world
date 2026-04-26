@@ -4,6 +4,47 @@ import { useGameStore } from '../../store/gameStore';
 import { useDiceStore } from '../../store/diceStore';
 import styles from './NarrativePanel.module.css';
 
+// ── Typewriter effect for DM narrative ───────────────────
+
+function useTypewriter(text: string, speed: number = 30, enabled: boolean = true) {
+  const [displayed, setDisplayed] = useState(enabled ? '' : text);
+  const [done, setDone] = useState(!enabled);
+  const indexRef = useRef(0);
+  const rafRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!enabled) {
+      setDisplayed(text);
+      setDone(true);
+      return;
+    }
+
+    // Reset on new text
+    setDisplayed('');
+    setDone(false);
+    indexRef.current = 0;
+
+    const tick = () => {
+      if (indexRef.current < text.length) {
+        indexRef.current += 1;
+        setDisplayed(text.slice(0, indexRef.current));
+        rafRef.current = setTimeout(tick, speed);
+      } else {
+        setDone(true);
+      }
+    };
+
+    rafRef.current = setTimeout(tick, speed);
+    return () => {
+      if (rafRef.current) clearTimeout(rafRef.current);
+    };
+  }, [text, speed, enabled]);
+
+  return { displayed, done };
+}
+
+// ── Typing indicator ─────────────────────────────────────
+
 function TypingIndicator() {
   const isDmTyping = useGameStore((s) => s.isDmTyping);
   if (!isDmTyping) return null;
@@ -17,9 +58,18 @@ function TypingIndicator() {
   );
 }
 
-function NarrativeEntry({ speaker, speakerLabel, text }: {
-  speaker: 'dm' | 'player'; speakerLabel: string; text: string;
+// ── Single narrative entry ────────────────────────────────
+
+function NarrativeEntry({ speaker, speakerLabel, text, isLatest }: {
+  speaker: 'dm' | 'player';
+  speakerLabel: string;
+  text: string;
+  isLatest: boolean;
 }) {
+  // Only animate the most recent DM entry
+  const shouldAnimate = speaker === 'dm' && isLatest;
+  const { displayed } = useTypewriter(text, 22, shouldAnimate);
+
   return (
     <div className={styles.entry}>
       <div className={[
@@ -29,11 +79,25 @@ function NarrativeEntry({ speaker, speakerLabel, text }: {
         {speakerLabel.toUpperCase()}
       </div>
       <div className={[styles.text, speaker === 'player' ? styles.textPlayer : ''].join(' ')}>
-        {text}
+        {shouldAnimate ? displayed : text}
+        {/* Blinking cursor while typing */}
+        {shouldAnimate && displayed.length < text.length && (
+          <span style={{
+            display: 'inline-block',
+            width: 2,
+            height: '1em',
+            background: 'var(--color-text-gold)',
+            marginLeft: 2,
+            verticalAlign: 'text-bottom',
+            animation: 'blink 0.8s step-end infinite',
+          }} />
+        )}
       </div>
     </div>
   );
 }
+
+// ── Quick actions ─────────────────────────────────────────
 
 const QUICK_ACTIONS = [
   { label: '⚔ ATTACK',      text: 'I attack the nearest enemy with my weapon.' },
@@ -44,21 +108,29 @@ const QUICK_ACTIONS = [
   { label: '🏃 DASH',        text: 'I use the Dash action to move quickly.' },
 ];
 
+// ── Main panel ────────────────────────────────────────────
+
 export function NarrativePanel({ sendAction }: {
   sendAction: (action: string, sessionId?: string, activeCharacter?: string) => void;
 }) {
-  const narrativeHistory   = useGameStore((s) => s.narrativeHistory);
-  const isDmTyping         = useGameStore((s) => s.isDmTyping);
-  const activeCharacterId  = useGameStore((s) => s.activeCharacterId);  // ← new
+  const narrativeHistory  = useGameStore((s) => s.narrativeHistory);
+  const isDmTyping        = useGameStore((s) => s.isDmTyping);
+  const activeCharacterId = useGameStore((s) => s.activeCharacterId);
   const { pendingRoll, consumeRoll } = useDiceStore();
 
   const [inputValue, setInputValue] = useState('');
   const scrollRef   = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Read session_id from URL — matches what useGameStream already does
   const sessionId = new URLSearchParams(window.location.search).get('session') ?? 'player_one';
 
+  // Find the index of the last DM entry so we know which one to animate
+  const lastDmIndex = narrativeHistory.reduce(
+    (last, entry, i) => entry.speaker === 'dm' ? i : last,
+    -1,
+  );
+
+  // Auto-scroll on new entries or typing indicator change
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
@@ -86,9 +158,7 @@ export function NarrativePanel({ sendAction }: {
       consumeRoll();
     }
 
-    // ── Pass active character so backend enforces turn order ──
     sendAction(actionText, sessionId, activeCharacterId);
-
     setInputValue('');
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
   };
@@ -112,8 +182,12 @@ export function NarrativePanel({ sendAction }: {
       <div className={styles.topMask} />
 
       <div className={styles.scroll} ref={scrollRef}>
-        {narrativeHistory.map((entry) => (
-          <NarrativeEntry key={entry.id} {...entry} />
+        {narrativeHistory.map((entry, i) => (
+          <NarrativeEntry
+            key={entry.id}
+            {...entry}
+            isLatest={i === lastDmIndex}
+          />
         ))}
         <TypingIndicator />
       </div>
@@ -135,10 +209,16 @@ export function NarrativePanel({ sendAction }: {
           }}>
             {pendingRoll!.isCrit ? '⚡ CRITICAL' : pendingRoll!.isFumble ? '💀 FUMBLE' : '🎲 ROLLED'}
           </span>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 18, color: 'var(--color-text-primary)', fontWeight: 500 }}>
+          <span style={{
+            fontFamily: 'var(--font-mono)', fontSize: 18,
+            color: 'var(--color-text-primary)', fontWeight: 500,
+          }}>
             {pendingRoll!.total}
           </span>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--color-text-muted)' }}>
+          <span style={{
+            fontFamily: 'var(--font-mono)', fontSize: 10,
+            color: 'var(--color-text-muted)',
+          }}>
             {pendingRoll!.expr} · will be included in your next action
           </span>
         </div>
@@ -146,7 +226,11 @@ export function NarrativePanel({ sendAction }: {
 
       <div className={styles.quickbar}>
         {QUICK_ACTIONS.map((qa) => (
-          <button key={qa.label} className={styles.quickBtn} onClick={() => handleQuickAction(qa.text)}>
+          <button
+            key={qa.label}
+            className={styles.quickBtn}
+            onClick={() => handleQuickAction(qa.text)}
+          >
             {qa.label}
           </button>
         ))}
