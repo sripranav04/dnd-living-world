@@ -1,11 +1,12 @@
 FROM node:20-slim
 
-# Install Python, pip, supervisor and psycopg system deps
+# Install Python, supervisor, nginx and system deps
 RUN apt-get update && apt-get install -y \
     python3 \
     python3-pip \
     python3-venv \
     supervisor \
+    nginx \
     libpq-dev \
     gcc \
     curl \
@@ -31,12 +32,20 @@ COPY backend/  ./backend/
 RUN mkdir -p /app/frontend/src/components/dynamic && \
     chmod 777 /app/frontend/src/components/dynamic
 
+# ── Basic auth credentials ─────────────────────────────
+RUN echo 'admin:$apr1$A7JebHEi$115pjAYIy1kznjpE8/ecQ/' > /etc/nginx/.htpasswd
+
+# ── Nginx config ───────────────────────────────────────
+COPY nginx.conf /etc/nginx/sites-available/default
+RUN ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
+
 # ── Supervisor config ──────────────────────────────────
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
-# ── Create supervisor log dir ──────────────────────────
+# ── Create log dirs ────────────────────────────────────
 RUN mkdir -p /var/log/supervisor
 
-EXPOSE 5173 8000
+# Nginx handles routing on port 80
+EXPOSE 80
 
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

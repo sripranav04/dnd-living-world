@@ -6,6 +6,10 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 5173,
-    allowedHosts: ['dnd-living-world.braveriver-d5a37ba2.eastus2.azurecontainerapps.io'],
+    allowedHosts: true,
+    hmr: {
+      clientPort: 443,
+      protocol: 'wss',
+    },
   },
 })
