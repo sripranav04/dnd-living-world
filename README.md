@@ -538,7 +538,6 @@ hmr: {
 
 This project explores the **agentic UI** paradigm — where AI doesn't just generate content but generates *interface*. The vibe coding concept (AI writes its own React components) is the architectural centrepiece, enabled by Vite's HMR system used in an unconventional production context.
 
-Built for the Cognizant AI Hackathon 2026.
 
 ---
 
