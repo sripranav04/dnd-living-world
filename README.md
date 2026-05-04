@@ -27,19 +27,7 @@ The UI literally evolves as the story does. This is the **vibe coding** paradigm
 
 ---
 
-## Demo
 
-**Live**: https://dnd-living-world.braveriver-d5a37ba2.eastus2.azurecontainerapps.io
-
-> Login required — contact the author for credentials.
-
-### Screenshots
-
-| Opening Scene | Combat | Victory |
-|---|---|---|
-| First-person dungeon corridor, torches flickering | Skeleton Archer looming large, HP bar depleting | Loot discovered, XP earned, story continues |
-
----
 
 ## Architecture
 
